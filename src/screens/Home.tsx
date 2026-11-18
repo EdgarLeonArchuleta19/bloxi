@@ -94,6 +94,27 @@ export function Home({
 
         {/* Juegos y disfraces */}
         <div className="no-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto short:gap-1">
+          {/* 🏙️ Modo principal */}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              sfx.tap();
+              onPlay('city');
+            }}
+            className="relative flex h-36 shrink-0 items-center overflow-hidden rounded-[28px] text-left text-white short:h-24 tablet:h-44"
+            style={{ background: 'linear-gradient(120deg,#5fc8ff 0%,#ff8cc0 100%)', boxShadow: '0 6px 0 #d9488a' }}
+          >
+            <img src="thumbs/city.jpg" alt="" draggable={false} className="h-full w-auto shrink-0 object-cover" style={{ aspectRatio: '1 / 1' }} />
+            <div className="absolute inset-y-0 left-0 w-[46%] bg-gradient-to-r from-transparent to-[#7fb8ff]/0" />
+            <div className="min-w-0 flex-1 px-5 short:px-3">
+              <div className="text-sm font-bold uppercase tracking-wider text-white/85 short:text-xs">✨ Modo principal</div>
+              <div className="title-stroke text-4xl font-bold leading-tight short:text-2xl tablet:text-5xl">Mi Ciudad</div>
+              <div className="mt-1 text-lg leading-snug text-white/95 short:hidden">🚗 Maneja, 🍦 compra helados y 💖 haz amigos</div>
+            </div>
+            <span className="mr-5 flex h-14 shrink-0 items-center rounded-full bg-white px-6 text-xl font-bold text-ink shadow-[0_4px_0_rgba(0,0,0,0.15)] short:mr-3 short:h-11 short:px-4 short:text-base">
+              ▶ Ir
+            </span>
+          </motion.button>
           <Row title={recentGames.length ? '🔁 Seguir jugando' : '🎮 Juegos'} action="🔍 Ver todos" onAction={onAllGames}>
             {games.slice(0, 10).map((g) => (
               <div key={g.id} className="w-[170px] shrink-0 short:w-[118px] tablet:w-[210px]">

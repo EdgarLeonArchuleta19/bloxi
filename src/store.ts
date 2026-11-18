@@ -20,6 +20,7 @@ interface SaveState {
   sound: boolean;
   controls: ControlsLayout | null; // null = acomodo automático
   allowRooms: boolean; // papás pueden apagar las salas con amigos
+  cityFriends: { name: string; avatar: AvatarConfig }[]; // amigos bots de la Mini Ciudad
   recent: string[]; // juegos jugados recientemente
   setName: (n: string) => void;
   addCoins: (n: number) => void;
@@ -36,6 +37,7 @@ interface SaveState {
   toggleSound: () => void;
   setControls: (c: ControlsLayout | null) => void;
   setAllowRooms: (v: boolean) => void;
+  addCityFriend: (f: { name: string; avatar: AvatarConfig }) => void;
   resetAll: () => void;
 }
 
@@ -51,6 +53,7 @@ const initial = {
   sound: true,
   controls: null as ControlsLayout | null,
   allowRooms: true,
+  cityFriends: [] as { name: string; avatar: AvatarConfig }[],
   recent: [] as string[],
 };
 
@@ -135,6 +138,7 @@ export const useGame = create<SaveState>()(
       toggleSound: () => set((s) => ({ sound: !s.sound })),
       setControls: (controls) => set({ controls }),
       setAllowRooms: (allowRooms) => set({ allowRooms }),
+      addCityFriend: (f) => set((s) => ({ cityFriends: [...s.cityFriends.filter((x) => x.name !== f.name), f].slice(-6) })),
       resetAll: () => set({ ...initial }),
     }),
     {

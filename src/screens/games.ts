@@ -17,6 +17,19 @@ export interface GameInfo {
 // 👉 Para agregar un juego nuevo: añádelo aquí y crea su nivel en src/game/levels
 export const GAMES: GameInfo[] = [
   {
+    id: 'city',
+    title: 'Mi Ciudad',
+    desc: 'Mundo abierto: tu casita, heladería, pizzería y tienda de ropa. ¡Maneja carritos y motos y haz amigos que te sigan por toda la ciudad!',
+    emoji: '🏙️',
+    thumb: 'thumbs/city.jpg',
+    gradient: 'linear-gradient(135deg,#7fd8ff 0%,#ff9ecb 100%)',
+    shade: '#d9488a',
+    category: 'Mundo abierto',
+    tags: ['ciudad', 'carros', 'motos', 'amigos', 'mundo abierto', 'casa', 'helado', 'pizza', 'tiendas'],
+    difficulty: 'Fácil',
+    duration: 'Libre',
+  },
+  {
     id: 'obby',
     title: 'Obby en las Nubes',
     desc: '8 etapas en el cielo: trampolines, plataformas que desaparecen, lava 🔥, elevadores y la meta del arcoíris. ¡Se guarda tu avance!',
@@ -54,6 +67,19 @@ export const GAMES: GameInfo[] = [
     tags: ['colores', 'piso', 'fiesta', 'rapido', 'baile', 'color block'],
     difficulty: 'Fácil',
     duration: '2 min',
+  },
+  {
+    id: 'lava',
+    title: 'El Piso es Lava',
+    desc: '¡Cuando suene la alarma súbete a un mueble antes de que el piso se vuelva lava! 10 rondas contra 7 jugadores y cada ronda se hunde un mueble.',
+    emoji: '🌋',
+    thumb: 'thumbs/lava.jpg',
+    gradient: 'linear-gradient(135deg,#ffb23f 0%,#ff3d5a 100%)',
+    shade: '#c42f3a',
+    category: 'Fiesta',
+    tags: ['lava', 'piso', 'fiesta', 'muebles', 'brincar', 'bots'],
+    difficulty: 'Medio',
+    duration: '3 min',
   },
 ];
 

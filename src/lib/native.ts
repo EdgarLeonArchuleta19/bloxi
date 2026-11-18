@@ -7,8 +7,12 @@ export function setupNativeFeel() {
   //    la app se acomoda al espacio visible (como una app nativa).
   const vv = window.visualViewport;
   const syncViewport = () => {
+    // Solo encogemos la app cuando el teclado está abierto. En el iPad instalado,
+    // visualViewport reporta unos pixeles menos que la pantalla y dejaba una barra abajo.
     const h = vv ? vv.height : window.innerHeight;
-    root.style.setProperty('--app-h', `${Math.round(h)}px`);
+    const keyboardOpen = !!vv && window.innerHeight - vv.height > 120;
+    if (keyboardOpen) root.style.setProperty('--app-h', `${Math.round(h)}px`);
+    else root.style.removeProperty('--app-h');
     // iOS desplaza la página al abrir el teclado: la regresamos a su lugar
     if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
   };

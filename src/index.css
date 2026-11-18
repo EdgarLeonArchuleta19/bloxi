@@ -34,8 +34,12 @@ body {
   position: fixed;
   inset: 0;
 }
+html {
+  /* por si algún pedacito queda sin pintar, que sea del mismo color que el fondo */
+  background: #ffe0f0;
+}
 #root {
-  height: var(--app-h, 100dvh);
+  height: var(--app-h, 100%);
   overflow: hidden;
   transition: height 0.18s ease-out;
 }
@@ -43,7 +47,7 @@ body {
 body {
   font-family: var(--font-sans);
   color: var(--color-ink);
-  background: linear-gradient(180deg, #bfe6ff 0%, #ffe3f1 100%);
+  background: linear-gradient(180deg, #a9dcff 0%, #d3ecff 50%, #ffe0f0 100%);
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;

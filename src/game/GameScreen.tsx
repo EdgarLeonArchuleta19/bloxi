@@ -6,14 +6,17 @@ import { sfx } from '../lib/sound';
 import { useGame } from '../store';
 import { CandyButton, CoinIcon, Confetti, Modal } from '../ui/kit';
 import { OBBY_CHECKPOINTS, ObbyLevel, formatTime } from './levels/Obby';
+import { AvatarEditor } from '../screens/AvatarEditor';
+import { CityLevel } from './levels/City';
 import { COLOR_ROUNDS, ColorFloorLevel } from './levels/ColorFloor';
+import { LAVA_ROUNDS, LavaLevel } from './levels/LavaFloor';
 import { STAR_TIME, StarIslandLevel } from './levels/StarIsland';
-import { useRun } from './runStore';
+import { triggerAction, useRun } from './runStore';
 import { backToLobby, leaveRoom, startRoomGame, useRoom } from '../net/room';
 import { ControlsEditor } from './ControlsEditor';
 import { TouchControls } from './TouchControls';
 
-export type GameId = 'obby' | 'stars' | 'colors';
+export type GameId = 'obby' | 'stars' | 'colors' | 'city' | 'lava';
 
 export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId; onExit: () => void; stage?: number; net?: boolean }) {
   // en sala el menú no detiene el juego (los demás siguen jugando)
@@ -34,6 +37,12 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
     useRun.getState().reset();
     if (id === 'stars') useRun.getState().set({ time: STAR_TIME });
     if (id === 'obby') useRun.getState().set({ checkpoint: stage });
+    if (id === 'city') {
+      // la ciudad es para pasear: sin cuenta regresiva
+      useRun.getState().set({ status: 'playing' });
+      setCount(null);
+      return;
+    }
     const seq = [3, 2, 1, 0];
     const timers = seq.map((n, i) =>
       setTimeout(() => {
@@ -76,12 +85,16 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
         {id === 'obby' && <ObbyLevel avatar={avatar} startStage={stage} />}
         {id === 'stars' && <StarIslandLevel avatar={avatar} />}
         {id === 'colors' && <ColorFloorLevel avatar={avatar} />}
+        {id === 'city' && <CityLevel avatar={avatar} />}
+        {id === 'lava' && <LavaLevel avatar={avatar} />}
       </Canvas>
 
       {status !== 'done' && <TouchControls />}
       <Hud id={id} onPause={() => (net ? setMenu(true) : useRun.getState().set({ status: 'paused' }))} />
-      {id === 'colors' && <ColorBanner />}
+      {(id === 'colors' || id === 'lava' || id === 'city') && <ColorBanner />}
+      <ActionButtons />
       <Toast />
+      <ClosetOverlay />
 
       {/* Cuenta regresiva */}
       <AnimatePresence>
@@ -116,7 +129,7 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
             >
               ▶ Seguir jugando
             </CandyButton>
-            {!net && (
+            {!net && id !== 'city' && (
               <CandyButton tone="sky" className="h-14 text-lg short:h-11 short:text-base" onClick={() => setRunKey((k) => k + 1)}>
                 🔄 Otra vez
               </CandyButton>
@@ -159,7 +172,8 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
 }
 
 function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
-  const { status, coins, time, stars, checkpoint, lives, round, players } = useRun();
+  const { status, coins, time, stars, checkpoint, lives, round, players, friends } = useRun();
+  const totalCoins = useGame((s) => s.coins);
   const low = id === 'stars' && time <= 10 && status === 'playing';
   return (
     <div className="safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3">
@@ -175,12 +189,18 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
       </button>
 
       <div className="flex items-center gap-3 rounded-full bg-white/95 px-5 py-2 text-2xl font-bold shadow-[0_5px_0_rgba(51,38,77,0.12)] max-sm:gap-2 max-sm:px-3 max-sm:text-lg short:py-1 short:text-lg">
-        {id === 'colors' ? (
+        {id === 'city' ? (
+          <>
+            <span>🏙️ Mi Ciudad</span>
+            <span className="h-6 w-0.5 rounded bg-ink/15" />
+            <span>💖 {friends}</span>
+          </>
+        ) : id === 'colors' || id === 'lava' ? (
           <>
             <span className="tracking-tight">{'❤️'.repeat(Math.max(0, lives))}{'🤍'.repeat(Math.max(0, 3 - lives))}</span>
             <span className="h-6 w-0.5 rounded bg-ink/15" />
             <span className="tabular-nums">
-              Ronda {Math.max(1, round)}/{COLOR_ROUNDS}
+              Ronda {Math.max(1, round)}/{id === 'lava' ? LAVA_ROUNDS : COLOR_ROUNDS}
             </span>
             <span className="h-6 w-0.5 rounded bg-ink/15" />
             <span className="tabular-nums">👥 {players}</span>
@@ -208,7 +228,7 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
 
       <div className="flex items-center gap-2 rounded-full bg-white/95 py-1.5 pl-1.5 pr-4 text-2xl font-bold shadow-[0_5px_0_rgba(51,38,77,0.12)] max-sm:text-lg short:text-lg">
         <CoinIcon size={34} />
-        <span className="tabular-nums">+{coins}</span>
+        <span className="tabular-nums">{id === 'city' ? totalCoins : `+${coins}`}</span>
       </div>
     </div>
   );
@@ -223,26 +243,85 @@ function ColorBanner() {
       <AnimatePresence>
         {banner && (
           <motion.div
-            key={banner.name + banner.color}
+            key={(banner.text ?? banner.name) + banner.color}
             initial={{ scale: 0.4, opacity: 0, y: -20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.7, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 320, damping: 26 }}
             className="flex flex-col items-center gap-2 rounded-[28px] bg-white/95 px-6 py-3 shadow-[0_6px_0_rgba(51,38,77,0.15)] short:py-2"
           >
-            <div className="flex items-center gap-3 text-3xl font-bold max-sm:text-2xl short:text-2xl">
-              <span className="h-11 w-11 rounded-2xl border-4 border-white shadow-md short:h-8 short:w-8" style={{ background: banner.color }} />
-              <span>
-                ¡Párate en <span style={{ color: banner.color, WebkitTextStroke: '1.5px #33264d', paintOrder: 'stroke fill' }}>{banner.name}</span>!
-              </span>
-            </div>
-            <div className="h-3 w-full min-w-[220px] overflow-hidden rounded-full bg-ink/10">
-              <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${bar * 100}%`, background: banner.color }} />
-            </div>
+            {banner.text ? (
+              <div className="text-3xl font-bold max-sm:text-2xl short:text-2xl" style={{ color: banner.color }}>
+                {banner.text}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 text-3xl font-bold max-sm:text-2xl short:text-2xl">
+                <span className="h-11 w-11 rounded-2xl border-4 border-white shadow-md short:h-8 short:w-8" style={{ background: banner.color }} />
+                <span>
+                  ¡Párate en <span style={{ color: banner.color, WebkitTextStroke: '1.5px #33264d', paintOrder: 'stroke fill' }}>{banner.name}</span>!
+                </span>
+              </div>
+            )}
+            {bar > 0 && (
+              <div className="h-3 w-full min-w-[220px] overflow-hidden rounded-full bg-ink/10">
+                <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${bar * 100}%`, background: banner.color }} />
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** Botones según dónde estés (ciudad): "🍦 Helado", "🚗 Manejar", "👋 Saludar"… */
+function ActionButtons() {
+  const actions = useRun((s) => s.actions);
+  const status = useRun((s) => s.status);
+  if (status !== 'playing') return null;
+  return (
+    <div className="safe-bottom pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center gap-3 px-36 short:px-28">
+      <AnimatePresence>
+        {actions.map((a) => (
+          <motion.div
+            key={a.id}
+            layout
+            initial={{ scale: 0.6, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.7, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+            className="pointer-events-auto mb-2"
+          >
+            <CandyButton tone={a.tone ?? 'mint'} className="h-16 px-6 text-xl short:h-12 short:px-4 short:text-base" onClick={() => triggerAction(a.id)}>
+              {a.label}
+            </CandyButton>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Armario dentro de la ciudad (tienda de ropa) */
+function ClosetOverlay() {
+  const overlay = useRun((s) => s.overlay);
+  return (
+    <AnimatePresence>
+      {overlay === 'closet' && (
+        <motion.div
+          className="safe-top safe-x safe-bottom fixed inset-0 z-[60] flex flex-col bg-gradient-to-b from-[#a9dcff] via-[#d3ecff] to-[#ffe0f0]"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <AvatarEditor
+            onBack={() => useRun.getState().set({ overlay: null, status: 'playing' })}
+            onGoPlay={() => useRun.getState().set({ overlay: null, status: 'playing' })}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

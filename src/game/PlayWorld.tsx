@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AvatarConfig } from '../data/items';
@@ -14,12 +14,16 @@ export interface Engine {
   cam: { yaw: number; pitch: number; dist: number };
   anim: AvatarAnim;
   solids: Solid[];
+  /** si no es null, la cámara se acomoda sola detrás de este ángulo (ej. al manejar) */
+  followYaw: number | null;
 }
 
 export interface LevelHooks {
   onTick?: (e: Engine, dt: number) => void;
   onLand?: (s: Solid, e: Engine) => void;
   onFall?: (e: Engine) => void;
+  /** si regresa true, el nivel mueve al personaje (ej. manejando) y no se usa la física normal */
+  control?: (e: Engine, dt: number) => boolean;
 }
 
 interface Props {
@@ -31,7 +35,29 @@ interface Props {
   hooks: React.RefObject<LevelHooks>;
   onEngine?: (e: Engine) => void;
   thumb?: ThumbShot;
+  /** la cámara no atraviesa paredes ni estas cajas extra (ej. copas de árboles) */
+  camCollide?: boolean;
+  camBlockers?: { min: THREE.Vector3; max: THREE.Vector3 }[];
 }
+
+/** Distancia a la que un rayo choca con una caja (Infinity si no choca) */
+function rayBox(o: THREE.Vector3, d: THREE.Vector3, min: THREE.Vector3, max: THREE.Vector3) {
+  let tmin = -Infinity, tmax = Infinity;
+  for (const k of ['x', 'y', 'z'] as const) {
+    if (Math.abs(d[k]) < 1e-6) {
+      if (o[k] < min[k] || o[k] > max[k]) return Infinity;
+      continue;
+    }
+    let t1 = (min[k] - o[k]) / d[k], t2 = (max[k] - o[k]) / d[k];
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return Infinity;
+  }
+  if (tmax < 0 || tmin < 0) return Infinity; // detrás, o la cámara empieza adentro
+  return tmin;
+}
+const camDir = new THREE.Vector3();
 
 /** Modo foto para generar las portadas de los juegos */
 export interface ThumbShot {
@@ -43,16 +69,19 @@ export interface ThumbShot {
 const tmpTarget = new THREE.Vector3();
 const tmpCam = new THREE.Vector3();
 
-export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngine, thumb }: Props) {
+export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngine, thumb, camCollide, camBlockers }: Props) {
   const camera = useThree((s) => s.camera);
   const engine = useMemo<Engine>(() => {
     const ctrl = new Controller();
     ctrl.reset(spawn, yaw + Math.PI);
-    const e = { ctrl, cam: { yaw, pitch: 0.42, dist: 9 }, anim: makeAnim(), solids: makeSolids(platforms) };
-    onEngine?.(e);
-    return e;
+    return { ctrl, cam: { yaw, pitch: 0.42, dist: 9 }, anim: makeAnim(), solids: makeSolids(platforms), followYaw: null } as Engine;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // entregar el motor al nivel ya montado (en desarrollo React construye todo dos veces)
+  useLayoutEffect(() => {
+    onEngine?.(engine);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine]);
   const player = useRef<THREE.Group>(null);
   const light = useRef<THREE.DirectionalLight>(null);
   const clock = useRef(0);
@@ -60,6 +89,8 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
   // cámara suave: ángulo deseado (del dedo) y punto al que mira, suavizados
   const aim = useRef<{ yaw: number; pitch: number } | null>(null);
   const look = useRef(new THREE.Vector3());
+  const dist = useRef(9);
+  const colDist = useRef(99);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
@@ -71,6 +102,12 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
     aim.current.yaw -= input.camDX * 0.007;
     aim.current.pitch = THREE.MathUtils.clamp(aim.current.pitch + input.camDY * 0.004, 0.08, 1.15);
     input.camDX = input.camDY = 0;
+    if (engine.followYaw !== null) {
+      // manejando: la cámara se va acomodando detrás, suavecito
+      let d = engine.followYaw - aim.current.yaw;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      aim.current.yaw += d * (1 - Math.exp(-2.5 * dt));
+    }
     const turn = 1 - Math.exp(-16 * dt);
     cam.yaw += (aim.current.yaw - cam.yaw) * turn;
     cam.pitch += (aim.current.pitch - cam.pitch) * turn;
@@ -91,16 +128,18 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       }
       input.jump = false;
 
-      const steps = Math.ceil(dt / (1 / 100));
-      const sdt = dt / steps;
-      for (let i = 0; i < steps; i++) {
-        const ev = ctrl.step(sdt, wx, wz, jump && i === 0, solids);
-        if (ev.jumped) sfx.jump();
-        if (ev.bounced) sfx.bounce();
-        if (ev.landedOn) hooks.current?.onLand?.(ev.landedOn, engine);
+      const controlled = hooks.current?.control?.(engine, dt) ?? false;
+      if (!controlled) {
+        const steps = Math.ceil(dt / (1 / 100));
+        const sdt = dt / steps;
+        for (let i = 0; i < steps; i++) {
+          const ev = ctrl.step(sdt, wx, wz, jump && i === 0, solids);
+          if (ev.jumped) sfx.jump();
+          if (ev.bounced) sfx.bounce();
+          if (ev.landedOn) hooks.current?.onLand?.(ev.landedOn, engine);
+        }
+        if (ctrl.pos.y < killY) hooks.current?.onFall?.(engine);
       }
-
-      if (ctrl.pos.y < killY) hooks.current?.onFall?.(engine);
       hooks.current?.onTick?.(engine, dt);
 
       updateFades(solids, ctrl.ground, dt);
@@ -130,8 +169,8 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       anim.cheer = 1;
       cam.yaw = Math.atan2(thumb.cam[0] - thumb.player[0], thumb.cam[2] - thumb.player[2]);
     }
-    anim.speed = ctrl.speed01;
-    anim.grounded = ctrl.grounded || ctrl.coyote > 0.05;
+    anim.speed = anim.sit ? 0 : ctrl.speed01;
+    anim.grounded = anim.sit || ctrl.grounded || ctrl.coyote > 0.05;
     anim.vy = ctrl.vel.y;
     if (player.current) {
       player.current.position.copy(ctrl.pos);
@@ -153,12 +192,34 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       // al reaparecer lejos (caída), brincar directo
       if (look.current.distanceTo(tmpTarget) > 12) look.current.copy(tmpTarget);
     }
+    dist.current += (cam.dist - dist.current) * (1 - Math.exp(-3 * dt));
     const cp = Math.cos(cam.pitch);
     tmpCam.set(
-      look.current.x + Math.sin(cam.yaw) * cp * cam.dist,
-      look.current.y + Math.sin(cam.pitch) * cam.dist,
-      look.current.z + Math.cos(cam.yaw) * cp * cam.dist,
+      look.current.x + Math.sin(cam.yaw) * cp * dist.current,
+      look.current.y + Math.sin(cam.pitch) * dist.current,
+      look.current.z + Math.cos(cam.yaw) * cp * dist.current,
     );
+    if (camCollide) {
+      // si hay una pared/árbol entre la niña y la cámara, la cámara se acerca
+      camDir.subVectors(tmpCam, look.current);
+      const len = camDir.length();
+      camDir.divideScalar(len || 1);
+      let best = len;
+      for (let i = 1; i < solids.length; i++) {
+        const s = solids[i];
+        if (!s.active || s.max.y < 0.6) continue;
+        const t = rayBox(look.current, camDir, s.min, s.max);
+        if (t < best) best = t;
+      }
+      if (camBlockers) for (const b of camBlockers) {
+        const t = rayBox(look.current, camDir, b.min, b.max);
+        if (t < best) best = t;
+      }
+      const want = Math.max(1.6, best - 0.45);
+      // acercarse rápido, alejarse despacito
+      colDist.current = want < colDist.current ? want : colDist.current + (want - colDist.current) * (1 - Math.exp(-4 * dt));
+      if (colDist.current < len) tmpCam.copy(look.current).addScaledVector(camDir, colDist.current);
+    }
     camera.position.copy(tmpCam);
     camera.lookAt(look.current);
     if (thumb) {

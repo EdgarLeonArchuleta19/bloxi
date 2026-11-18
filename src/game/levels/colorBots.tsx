@@ -7,7 +7,7 @@ import type { Solid } from '../physics';
 
 // 🤖 Jugadores de mentiritas para Piso de Colores (todo pasa en el dispositivo, nadie real)
 
-const NAMES = [
+export const NAMES = [
   'LunaStar', 'MateoPro', 'ValeRainbow', 'LeoDino', 'MiaCookie', 'NicoBlox', 'EmmaPanda', 'TomiRocket',
   'AbiUnicorn', 'SantiNinja', 'ZoeGalaxy', 'DaniPizza', 'RegiCandy', 'MaxiShark', 'CamiFlower', 'BrunoBloxi',
 ];
@@ -50,7 +50,8 @@ export function randomAvatar(): AvatarConfig {
 }
 
 export function makeBots(count: number, spots: THREE.Vector3[], playerName: string): Bot[] {
-  const names = NAMES.filter((n) => !n.toLowerCase().startsWith(playerName.toLowerCase().slice(0, 3))).sort(() => Math.random() - 0.5);
+  const prefix = playerName.toLowerCase().slice(0, 3);
+  const names = NAMES.filter((n) => prefix.length < 2 || !n.toLowerCase().startsWith(prefix)).sort(() => Math.random() - 0.5);
   return Array.from({ length: count }, (_, i) => ({
     id: `bot${i}`,
     name: names[i % names.length],

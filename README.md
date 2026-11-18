@@ -56,6 +56,22 @@ princesa, superhéroe y astronauta.
 **👑 Y más:** 9 caras, 11 gorros, 5 lentes y 7 cosas para la espalda (alas que aletean, capa, jetpack).
 También tiene un botón **🎲 ¡Sorpréndeme!** que arma un outfit al azar.
 
+## 🏙️ Mi Ciudad (modo principal)
+
+Un mundo semi-abierto para pasear libremente:
+
+- 🏠 **Tu casita** con jardín y letrero con tu nombre (y una siesta 😴)
+- 🍦 **Heladería**, 🍕 **Pizzería** y 🎈 **globos**: se compran con monedas y los cargas en la mano (¡y tus amigos también reciben!)
+- 👗 **Tienda de ropa**: abre el armario sin salir de la ciudad
+- ⛲ **Fuente de los deseos**
+- 🚗 **Carritos y motos** para manejar por las calles (¡con claxon!)
+- 🧒 **Bots** que pasean, platican y se pueden volver **tus amigos 💖**: te siguen por toda la ciudad y se quedan guardados
+- 🪙 Monedas regadas por toda la ciudad
+
+<div align="center">
+<img src="docs/ciudad.png" width="820" alt="Mi Ciudad" />
+</div>
+
 ## 🎮 Minijuegos
 
 <div align="center">
@@ -66,12 +82,14 @@ También tiene un botón **🎲 ¡Sorpréndeme!** que arma un outfit al azar.
 |---|---|
 | ☁️ **Obby en las Nubes** | Parkour de **8 etapas** en el cielo: escalones, plataformas que se mueven, trampolines, puente angosto, plataformas que desaparecen 👻, piedritas sobre lava 🔥, escalera al cielo con elevador y final arcoíris 🌈. Si te caes regresas al checkpoint, y **se guarda tu avance** para seguir otro día. |
 | ⭐ **Atrapa Estrellas** | 60 segundos para juntar estrellas en una isla con árboles, torres y trampolines. ¡Las estrellas arcoíris valen triple! |
+| 🌋 **El Piso es Lava** | Cuando suena la alarma, ¡súbete a un mueble antes de que el piso se vuelva lava! 10 rondas contra 7 bots y cada ronda se hunde un mueble. |
 | 🎨 **Piso de Colores** | ¡Contra 7 jugadores bot 🤖 con nombres y outfits al azar! Sale un color y hay que pararse en él antes de que los demás cuadros se caigan al agua. Gana quien quede al final (🥇🥈🥉). Tú tienes 3 vidas ❤️❤️❤️. Los bots son de mentiritas: todo pasa en el dispositivo. |
 
 <div align="center">
 <img src="docs/juego-obby.png" width="270" alt="Obby en las Nubes" />
 <img src="docs/juego-estrellas.png" width="270" alt="Atrapa Estrellas" />
 <img src="docs/juego-colores.png" width="270" alt="Piso de Colores" />
+<img src="docs/juego-lava.png" width="270" alt="El Piso es Lava" />
 </div>
 
 El catálogo tiene **buscador y categorías**, así que está listo para muchos juegos más.

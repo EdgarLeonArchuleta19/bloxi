@@ -15,6 +15,9 @@ export interface AvatarAnim {
   grounded: boolean;
   vy: number;
   cheer: number; // segundos restantes de festejo
+  sit?: boolean; // sentado (manejando)
+  hold?: string; // 'icecream' | 'pizza' | 'balloon' en la mano
+  wave?: number; // segundos saludando con la mano
 }
 
 export const makeAnim = (): AvatarAnim => ({ speed: 0, grounded: true, vy: 0, cheer: 0 });
@@ -36,6 +39,9 @@ export function Avatar({ config, anim }: { config: AvatarConfig; anim?: AvatarAn
   const cape = useRef<THREE.Group>(null);
   const flames = useRef<THREE.Group>(null);
   const halo = useRef<THREE.Mesh>(null);
+  const holdIce = useRef<THREE.Group>(null);
+  const holdPizza = useRef<THREE.Group>(null);
+  const holdBalloon = useRef<THREE.Group>(null);
   const phase = useRef(0);
 
   const face = useMemo(() => {
@@ -56,6 +62,20 @@ export function Avatar({ config, anim }: { config: AvatarConfig; anim?: AvatarAn
       lx = 0.5; rx = -0.35; alx = -0.3; arx = -0.3; alz = -1.1; arz = 1.1;
     }
     let bounceY = a.speed < 0.1 && a.grounded ? Math.sin(t * 2.2) * 0.015 : Math.abs(Math.sin(phase.current)) * 0.05 * a.speed;
+    if (a.hold && a.hold !== 'balloon') arx = -0.95; // brazo al frente sosteniendo algo
+    if (a.wave && a.wave > 0) {
+      a.wave -= dt;
+      arz = 2.5 + Math.sin(t * 14) * 0.35;
+      arx = 0;
+    }
+    if (a.sit) {
+      // sentado manejando: piernas al frente, manos al volante
+      lx = rx = -1.45;
+      alx = arx = -1.05;
+      alz = -0.12;
+      arz = 0.12;
+      bounceY = 0;
+    }
     if (a.cheer > 0) {
       a.cheer -= dt;
       alz = -2.7 + Math.sin(t * 14) * 0.25;
@@ -86,6 +106,12 @@ export function Avatar({ config, anim }: { config: AvatarConfig; anim?: AvatarAn
     if (flames.current) {
       const s = (a.grounded ? 0.5 : 1.3) + Math.sin(t * 40) * 0.15;
       flames.current.scale.set(1, s, 1);
+    }
+    if (holdIce.current) holdIce.current.visible = a.hold === 'icecream';
+    if (holdPizza.current) holdPizza.current.visible = a.hold === 'pizza';
+    if (holdBalloon.current) {
+      holdBalloon.current.visible = a.hold === 'balloon';
+      holdBalloon.current.rotation.z = Math.sin(t * 1.6) * 0.08;
     }
     if (halo.current) halo.current.position.y = 0.66 + Math.sin(t * 2.5) * 0.03;
   });
@@ -151,8 +177,21 @@ export function Avatar({ config, anim }: { config: AvatarConfig; anim?: AvatarAn
           <group key={x} ref={ref as React.RefObject<THREE.Group>} position={[x, 0.75, 0]}>
             <mesh castShadow geometry={rbox(0.34, 0.36, 0.38)} material={sleeve} position={[0, -0.14, 0]} />
             <mesh castShadow geometry={rbox(0.3, 0.46, 0.32)} material={forearm} position={[0, -0.52, 0]} />
+            {x > 0 && <HandItems ice={holdIce} pizza={holdPizza} />}
           </group>
         ))}
+        {/* globo (flota arriba de la mano) */}
+        <group ref={holdBalloon} position={[0.78, 0.3, 0.15]} visible={false}>
+          <mesh material={mat('#ffffff')} position={[0, 0.8, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, 1.6, 4]} />
+          </mesh>
+          <mesh castShadow material={mat('#ff4d8b', { rough: 0.25 })} position={[0, 1.85, 0]} scale={[1, 1.18, 1]}>
+            <sphereGeometry args={[0.38, 18, 16]} />
+          </mesh>
+          <mesh material={mat('#ff4d8b')} position={[0, 1.42, 0]}>
+            <coneGeometry args={[0.07, 0.12, 8]} />
+          </mesh>
+        </group>
 
         {/* Cabeza */}
         <group position={[0, 1.13, 0]}>
@@ -235,6 +274,39 @@ function Tank({ m }: { m: THREE.Material }) {
         <mesh key={x} geometry={rbox(0.14, 0.16, 0.46, 0.04)} material={m} position={[x, 0.76, 0]} />
       ))}
     </>
+  );
+}
+
+/* ---------------- Cosas en la mano ---------------- */
+function HandItems({ ice, pizza }: { ice: React.RefObject<THREE.Group | null>; pizza: React.RefObject<THREE.Group | null> }) {
+  return (
+    <group position={[0, -0.82, 0.05]}>
+      <group ref={ice} visible={false}>
+        <mesh material={mat('#e0a35c')} position={[0, -0.12, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.13, 0.36, 12]} />
+        </mesh>
+        <mesh material={mat('#ff9ecb')} position={[0, 0.1, 0]}>
+          <sphereGeometry args={[0.15, 14, 12]} />
+        </mesh>
+        <mesh material={mat('#7fd8ff')} position={[0, 0.27, 0]}>
+          <sphereGeometry args={[0.12, 14, 12]} />
+        </mesh>
+        <mesh material={mat('#ff3d5a')} position={[0, 0.4, 0]}>
+          <sphereGeometry args={[0.045, 8, 6]} />
+        </mesh>
+      </group>
+      <group ref={pizza} visible={false} rotation={[0.3, 0, 0]}>
+        <mesh material={mat('#ffcf4a')} position={[0, -0.15, 0.05]} rotation={[0, 0, Math.PI]}>
+          <coneGeometry args={[0.22, 0.45, 3]} />
+        </mesh>
+        <mesh material={mat('#c98a4b')} position={[0, 0.07, 0.05]}>
+          <boxGeometry args={[0.4, 0.08, 0.1]} />
+        </mesh>
+        <mesh material={mat('#e0413a')} position={[0.03, -0.1, 0.12]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.05, 0.05, 0.02, 10]} />
+        </mesh>
+      </group>
+    </group>
   );
 }
 
