@@ -91,7 +91,7 @@ export function Home({
 
         <Row title="🎭 Disfraces chistosos" action="Ir al armario" onAction={() => onEdit('outfit')}>
           {outfits.map((o) => {
-            const has = owned.includes(`outfit:${o.id}`);
+            const has = o.price === 0 || owned.includes(`outfit:${o.id}`);
             const wearing = avatar.outfit === o.id;
             return (
               <motion.button
@@ -108,7 +108,7 @@ export function Home({
                 {wearing ? (
                   <span className="mt-1 rounded-full bg-mint px-2.5 text-sm font-bold text-white">Puesto ✓</span>
                 ) : has ? (
-                  <span className="mt-1 rounded-full bg-[#f1ebff] px-2.5 text-sm font-bold text-grape-dark">Es tuyo</span>
+                  <span className="mt-1 rounded-full bg-[#f1ebff] px-2.5 text-sm font-bold text-grape-dark">{o.price === 0 ? "¡Gratis!" : "Es tuyo"}</span>
                 ) : (
                   <span className="mt-1 flex items-center gap-1 rounded-full bg-sun px-2.5 text-sm font-bold text-[#5a3b00]">
                     <CoinIcon size={16} /> {o.price}
