@@ -48,7 +48,7 @@ export function Onboarding() {
             initial={{ y: 60, opacity: 0, scale: 0.9 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: -40, opacity: 0, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 26 }}
           >
             <h1 className="text-3xl font-bold">¡Hola! 👋</h1>
             <p className="mt-1 text-xl text-ink/70 short:text-lg">Elige tu Bloxi y escribe tu nombre</p>
@@ -95,7 +95,7 @@ export function Onboarding() {
             className="card w-full max-w-md p-7 text-center"
             initial={{ y: 60, opacity: 0, scale: 0.9 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 26 }}
           >
             <Confetti count={50} />
             <h1 className="text-4xl font-bold">¡Hola, {clean}! 🎉</h1>
@@ -104,7 +104,7 @@ export function Onboarding() {
               className="mx-auto mt-5 flex w-fit items-center gap-3 rounded-3xl bg-[#fff6d6] px-6 py-4"
               initial={{ scale: 0, rotate: -15 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 300, damping: 12 }}
+              transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 16 }}
             >
               <CoinIcon size={50} />
               <div className="text-left">

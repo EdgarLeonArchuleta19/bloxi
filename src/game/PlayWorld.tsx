@@ -57,16 +57,23 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
   const light = useRef<THREE.DirectionalLight>(null);
   const clock = useRef(0);
   const first = useRef(true);
+  // cámara suave: ángulo deseado (del dedo) y punto al que mira, suavizados
+  const aim = useRef<{ yaw: number; pitch: number } | null>(null);
+  const look = useRef(new THREE.Vector3());
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
     const { ctrl, cam, anim, solids } = engine;
     const status = useRun.getState().status;
 
-    // cámara: arrastrar con el dedo
-    cam.yaw -= input.camDX * 0.007;
-    cam.pitch = THREE.MathUtils.clamp(cam.pitch + input.camDY * 0.004, 0.08, 1.15);
+    // cámara: arrastrar con el dedo (se desliza hacia el ángulo nuevo, sin brincos)
+    if (!aim.current) aim.current = { yaw: cam.yaw, pitch: cam.pitch };
+    aim.current.yaw -= input.camDX * 0.007;
+    aim.current.pitch = THREE.MathUtils.clamp(aim.current.pitch + input.camDY * 0.004, 0.08, 1.15);
     input.camDX = input.camDY = 0;
+    const turn = 1 - Math.exp(-16 * dt);
+    cam.yaw += (aim.current.yaw - cam.yaw) * turn;
+    cam.pitch += (aim.current.pitch - cam.pitch) * turn;
 
     if (status === 'playing' || status === 'done') {
       clock.current += dt;
@@ -131,19 +138,29 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       player.current.rotation.y = ctrl.facing;
     }
 
-    // cámara en tercera persona
+    // cámara en tercera persona: un solo punto suavizado (sin temblorcitos)
     tmpTarget.copy(ctrl.pos).y += 1.6;
+    if (first.current) {
+      look.current.copy(tmpTarget);
+      first.current = false;
+    } else {
+      // de lado sigue rápido; de arriba/abajo más suave para que los saltos no zangoloteen
+      const fh = 1 - Math.exp(-14 * dt);
+      const fv = 1 - Math.exp(-6 * dt);
+      look.current.x += (tmpTarget.x - look.current.x) * fh;
+      look.current.z += (tmpTarget.z - look.current.z) * fh;
+      look.current.y += (tmpTarget.y - look.current.y) * fv;
+      // al reaparecer lejos (caída), brincar directo
+      if (look.current.distanceTo(tmpTarget) > 12) look.current.copy(tmpTarget);
+    }
     const cp = Math.cos(cam.pitch);
     tmpCam.set(
-      tmpTarget.x + Math.sin(cam.yaw) * cp * cam.dist,
-      tmpTarget.y + Math.sin(cam.pitch) * cam.dist,
-      tmpTarget.z + Math.cos(cam.yaw) * cp * cam.dist,
+      look.current.x + Math.sin(cam.yaw) * cp * cam.dist,
+      look.current.y + Math.sin(cam.pitch) * cam.dist,
+      look.current.z + Math.cos(cam.yaw) * cp * cam.dist,
     );
-    if (first.current) {
-      camera.position.copy(tmpCam);
-      first.current = false;
-    } else camera.position.lerp(tmpCam, 1 - Math.exp(-12 * dt));
-    camera.lookAt(tmpTarget);
+    camera.position.copy(tmpCam);
+    camera.lookAt(look.current);
     if (thumb) {
       camera.position.set(...thumb.cam);
       camera.lookAt(...thumb.look);

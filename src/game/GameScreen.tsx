@@ -66,11 +66,10 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
     <div className="fixed inset-0 overflow-hidden bg-gradient-to-b from-[#8fd3ff] via-[#c4e7ff] to-[#ffe3f1]">
       <Canvas
         key={runKey}
-        // ⚡ sombras PCF (más ligeras), resolución máx 1.5x y sin antialias en pantallas Retina
-        shadows="percentage"
+        shadows
         flat
-        dpr={[1, 1.5]}
-        gl={{ antialias: window.devicePixelRatio < 2, alpha: true, powerPreference: 'high-performance' }}
+        dpr={[1, 1.75]}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
         camera={{ fov: 55, near: 0.1, far: 400, position: [0, 5, -10] }}
         className="!absolute inset-0"
       >
@@ -93,7 +92,7 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
             initial={{ scale: 2.2, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.5, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 20 }}
           >
             <span className="title-stroke text-[min(140px,28vmin)] font-bold leading-none text-sun drop-shadow-lg">
               {count === 0 ? '¡YA!' : count}
@@ -228,7 +227,7 @@ function ColorBanner() {
             initial={{ scale: 0.4, opacity: 0, y: -20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.7, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
             className="flex flex-col items-center gap-2 rounded-[28px] bg-white/95 px-6 py-3 shadow-[0_6px_0_rgba(51,38,77,0.15)] short:py-2"
           >
             <div className="flex items-center gap-3 text-3xl font-bold max-sm:text-2xl short:text-2xl">
@@ -265,7 +264,7 @@ function Toast() {
             initial={{ scale: 0.3, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.8, opacity: 0, y: -20 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
             className="title-stroke px-4 text-center text-5xl font-bold text-white drop-shadow-lg max-sm:text-3xl short:text-3xl"
           >
             {visible.text}

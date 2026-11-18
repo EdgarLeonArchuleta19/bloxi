@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AvatarConfig } from '../../data/items';
@@ -377,28 +377,22 @@ function Water() {
   );
 }
 
-/** ⚡ 60 florecitas dibujadas de un jalón (InstancedMesh) */
 function Flowers() {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  useLayoutEffect(() => {
-    const m = ref.current;
-    if (!m) return;
-    const cs = ['#ff7ab6', '#ffffff', '#ffcf33', '#b07cff'].map((c) => new THREE.Color(c));
-    const d = new THREE.Object3D();
+  const list = useMemo(() => {
+    const out: { x: number; z: number; c: string }[] = [];
+    const cs = ['#ff7ab6', '#ffffff', '#ffcf33', '#b07cff'];
     for (let i = 0; i < 60; i++) {
-      d.position.set((Math.random() - 0.5) * 44, 0.1, (Math.random() - 0.5) * 44);
-      d.scale.set(1, 0.5, 1);
-      d.updateMatrix();
-      m.setMatrixAt(i, d.matrix);
-      m.setColorAt(i, cs[i % cs.length]);
+      out.push({ x: (Math.random() - 0.5) * 44, z: (Math.random() - 0.5) * 44, c: cs[i % cs.length] });
     }
-    m.instanceMatrix.needsUpdate = true;
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    return out;
   }, []);
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, 60]}>
-      <sphereGeometry args={[0.12, 8, 6]} />
-      <meshLambertMaterial />
-    </instancedMesh>
+    <>
+      {list.map((f, i) => (
+        <mesh key={i} material={mat(f.c)} position={[f.x, 0.1, f.z]} scale={[1, 0.5, 1]}>
+          <sphereGeometry args={[0.12, 8, 6]} />
+        </mesh>
+      ))}
+    </>
   );
 }

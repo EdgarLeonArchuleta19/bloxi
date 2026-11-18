@@ -47,10 +47,10 @@ export function Showcase({ config, cheerKey = 0, zoom = 1, className }: Props) {
       onPointerCancel={() => (spin.current.dragging = false)}
     >
       <Canvas
-        shadows="percentage"
+        shadows
         flat
-        dpr={[1, 1.5]}
-        gl={{ antialias: window.devicePixelRatio < 2, alpha: true }}
+        dpr={[1, 1.75]}
+        gl={{ antialias: true, alpha: true }}
         camera={{ position: [0, 1.65, 6.8 / zoom], fov: 32 }}
         onCreated={({ camera }) => camera.lookAt(0, 1.22, 0)}
       >

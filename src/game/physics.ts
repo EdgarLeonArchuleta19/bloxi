@@ -191,7 +191,7 @@ export class Controller {
       const target = Math.atan2(this.vel.x, this.vel.z);
       let d = target - this.facing;
       d = Math.atan2(Math.sin(d), Math.cos(d));
-      this.facing += d * (1 - Math.exp(-14 * dt));
+      this.facing += d * (1 - Math.exp(-11 * dt));
     }
     return ev;
   }

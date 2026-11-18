@@ -49,7 +49,7 @@ export function Avatar({ config, anim }: { config: AvatarConfig; anim?: AvatarAn
     const t = state.clock.elapsedTime;
     phase.current += dt * (3 + a.speed * 9);
     const sw = Math.sin(phase.current) * 0.85 * a.speed;
-    const k = 14;
+    const k = 11;
 
     let lx = sw, rx = -sw, alx = -sw * 0.9, arx = sw * 0.9, alz = -0.05, arz = 0.05;
     if (!a.grounded) {

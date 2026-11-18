@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DEFAULT_AVATAR, HAIR_COLORS, ITEMS, SKIN_COLORS, type AvatarConfig, type Category } from '../../data/items';
@@ -175,27 +175,9 @@ export function nameTag(name: string) {
   return new THREE.SpriteMaterial({ map: t, depthWrite: false, transparent: true, sizeAttenuation: false });
 }
 
-// ⚡ sombrita redonda (mucho más ligera que sombras reales para muchos personajes)
-const blobGeo = new THREE.CircleGeometry(0.62, 20);
-blobGeo.rotateX(-Math.PI / 2);
-const blobMat = new THREE.MeshBasicMaterial({ color: '#33264d', transparent: true, opacity: 0.18, depthWrite: false });
-export function BlobShadow() {
-  return <mesh geometry={blobGeo} material={blobMat} position={[0, 0.03, 0]} renderOrder={-1} />;
-}
-
-/** Los personajes extra no proyectan sombra real (solo la sombrita) */
-export function useNoShadows(groups: React.RefObject<(THREE.Object3D | null)[] | THREE.Object3D | null>) {
-  useLayoutEffect(() => {
-    const g = groups.current;
-    const list = Array.isArray(g) ? g : [g];
-    list.forEach((o) => o?.traverse((c) => (c.castShadow = false)));
-  });
-}
-
 export function BotsView({ bots }: { bots: Bot[] }) {
   const refs = useRef<(THREE.Group | null)[]>([]);
   const tags = useMemo(() => bots.map((b) => nameTag(b.name)), [bots]);
-  useNoShadows(refs);
   useFrame(() => {
     bots.forEach((b, i) => {
       const o = refs.current[i];
@@ -210,7 +192,6 @@ export function BotsView({ bots }: { bots: Bot[] }) {
       {bots.map((b, i) => (
         <group key={i} ref={(o) => void (refs.current[i] = o)} position={b.pos}>
           <Avatar config={b.cfg} anim={b.anim} />
-          <BlobShadow />
           <sprite material={tags[i]} position={[0, 2.95, 0]} scale={[0.15, 0.0375, 1]} />
         </group>
       ))}

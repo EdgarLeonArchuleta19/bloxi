@@ -93,7 +93,7 @@ export function AvatarEditor({ onGoPlay, onBack, initialTab = 'outfit' }: { onGo
                   <motion.span
                     layoutId="group-pill"
                     className="absolute inset-0 rounded-2xl bg-grape shadow-[0_3px_0_#5f37c9]"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    transition={{ type: 'spring', stiffness: 420, damping: 38 }}
                   />
                 )}
                 <span className="relative text-2xl leading-none short:text-lg">{g.emoji}</span>
@@ -127,7 +127,7 @@ export function AvatarEditor({ onGoPlay, onBack, initialTab = 'outfit' }: { onGo
 
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 pt-2">
           <AnimatePresence mode="wait">
-            <motion.div key={tab.id} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} transition={{ duration: 0.15 }}>
+            <motion.div key={tab.id} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}>
               {tab.cat === 'skin' && <Palette label="Color de piel" colorKey="skin" colors={SKIN_COLORS} onPick={() => setCheer((c) => c + 1)} />}
               {tab.cat === 'hair' && <Palette label="Color de pelo" colorKey="hairColor" colors={HAIR_COLORS} onPick={() => setCheer((c) => c + 1)} />}
               {items.length > 0 && (

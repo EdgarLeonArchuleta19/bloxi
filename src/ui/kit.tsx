@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { sfx } from '../lib/sound';
+import { EASE_OUT, popSpring, softSpring, tapSpring } from './motion';
 
 export type Tone = 'candy' | 'grape' | 'sun' | 'mint' | 'sky' | 'white';
 
@@ -31,7 +32,8 @@ export function CandyButton({
   const t = TONES[tone];
   return (
     <motion.button
-      whileTap={disabled ? undefined : { scale: 0.94 }}
+      whileTap={disabled ? undefined : { scale: 0.95 }}
+      transition={tapSpring}
       disabled={disabled}
       onClick={() => {
         if (disabled) return;
@@ -78,7 +80,7 @@ export function CoinPill({ amount, className = '' }: { amount: number; className
       key={bump}
       initial={{ scale: bump ? 1.25 : 1 }}
       animate={{ scale: 1 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+      transition={popSpring}
       className={`flex shrink-0 items-center gap-2 rounded-full bg-white/95 pl-1.5 pr-4 py-1.5 text-xl font-bold shadow-[0_4px_0_rgba(51,38,77,0.1)] ${className}`}
     >
       <CoinIcon size={30} />
@@ -119,14 +121,15 @@ export function Modal({ open, onClose, children, wide }: { open: boolean; onClos
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.25, ease: EASE_OUT }}
         >
           <div className="absolute inset-0 bg-[#33264d]/40 backdrop-blur-sm" onClick={onClose} />
           <motion.div
             className={`card no-scrollbar relative max-h-[calc(var(--app-h,100dvh)-24px)] w-full overflow-y-auto p-6 text-center short:p-4 ${wide ? 'max-w-[min(820px,92vw)]' : 'max-w-md short:max-w-xl'}`}
-            initial={{ scale: 0.6, y: 40 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+            initial={{ scale: 0.9, y: 24, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.96, y: 8, opacity: 0, transition: { duration: 0.18, ease: EASE_OUT } }}
+            transition={softSpring}
           >
             {children}
           </motion.div>
@@ -232,7 +235,7 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) 
     >
       <motion.span
         layout
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        transition={tapSpring}
         className="absolute top-1 h-8 w-8 rounded-full bg-white shadow"
         style={{ left: on ? 36 : 4 }}
       />
@@ -244,7 +247,8 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) 
 export function RoundButton({ onClick, children, label }: { onClick: () => void; children: React.ReactNode; label: string }) {
   return (
     <motion.button
-      whileTap={{ scale: 0.86 }}
+      whileTap={{ scale: 0.88 }}
+      transition={tapSpring}
       aria-label={label}
       onClick={() => {
         sfx.tap();

@@ -81,7 +81,7 @@ export function Home({
           className="card relative flex w-[36%] shrink-0 flex-col overflow-hidden short:w-[32%]"
           initial={{ scale: 0.92, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 26 }}
         >
           <div className="absolute inset-0 bg-gradient-to-b from-[#e7f6ff] to-[#fff0f8]" />
           <Showcase config={avatar} className="relative min-h-0 flex-1" />

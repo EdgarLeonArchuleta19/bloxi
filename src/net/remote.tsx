@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { BlobShadow, nameTag, useNoShadows } from '../game/levels/colorBots';
+import { nameTag } from '../game/levels/colorBots';
 import type { Engine } from '../game/PlayWorld';
 import { Avatar, makeAnim, type AvatarAnim } from '../three/Avatar';
 import { broadcast, sendToHost, useRoom } from './room';
@@ -96,7 +96,6 @@ function RemoteOne({ id, name, avatar }: { id: string; name: string; avatar: Par
   const ref = useRef<THREE.Group>(null);
   const anim = useMemo<AvatarAnim>(makeAnim, []);
   const tag = useMemo(() => nameTag(name), [name]);
-  useNoShadows(ref);
   useFrame((_, rawDt) => {
     const o = ref.current;
     const r = remotes.get(id);
@@ -121,7 +120,6 @@ function RemoteOne({ id, name, avatar }: { id: string; name: string; avatar: Par
   return (
     <group ref={ref} visible={false}>
       <Avatar config={avatar} anim={anim} />
-      <BlobShadow />
       <sprite material={tag} position={[0, 2.95, 0]} scale={[0.15, 0.0375, 1]} />
     </group>
   );

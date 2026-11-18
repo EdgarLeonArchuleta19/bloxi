@@ -12,6 +12,7 @@ import { Settings } from './screens/Settings';
 import { applyUpdate, useUpdate } from './lib/pwa';
 import { useGame } from './store';
 import { RotateDevice, SkyBackground } from './ui/kit';
+import { fadeTransition, pageTransition, popSpring } from './ui/motion';
 
 type Screen = 'home' | 'play' | 'avatar' | 'settings' | 'friends';
 
@@ -20,9 +21,9 @@ const linkCode = new URLSearchParams(location.search).get('sala') ?? '';
 
 // Transición tipo iOS: la pantalla nueva entra desde la derecha y la anterior se recorre un poquito
 const slide = {
-  enter: (dir: number) => ({ x: dir > 0 ? '100%' : '-25%', opacity: dir > 0 ? 1 : 0.6 }),
+  enter: (dir: number) => ({ x: dir > 0 ? '100%' : '-22%', opacity: dir > 0 ? 1 : 0.7 }),
   center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? '-25%' : '100%', opacity: dir > 0 ? 0.6 : 1 }),
+  exit: (dir: number) => ({ x: dir > 0 ? '-22%' : '100%', opacity: dir > 0 ? 0.7 : 1 }),
 };
 
 export default function App() {
@@ -98,7 +99,7 @@ export default function App() {
       <SkyBackground />
       <AnimatePresence mode="wait">
         {screen === 'onboarding' && (
-          <motion.div key="onb" className="absolute inset-0" exit={{ opacity: 0, scale: 1.05 }} transition={{ duration: 0.25 }}>
+          <motion.div key="onb" className="absolute inset-0" exit={{ opacity: 0, scale: 1.03 }} transition={fadeTransition}>
             <Onboarding />
           </motion.div>
         )}
@@ -106,16 +107,16 @@ export default function App() {
           <motion.div
             key="game"
             className="absolute inset-0"
-            initial={{ opacity: 0, scale: 1.04 }}
+            initial={{ opacity: 0, scale: 1.02 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={fadeTransition}
           >
             <GameScreen id={game} stage={stage} onExit={exitGame} />
           </motion.div>
         )}
         {screen === 'net' && (
-          <motion.div key={`net${roomRun}`} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+          <motion.div key={`net${roomRun}`} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
             <GameScreen
               id={roomGame}
               net
@@ -128,7 +129,7 @@ export default function App() {
           </motion.div>
         )}
         {screen === 'app' && (
-          <motion.div key="app" className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+          <motion.div key="app" className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
             <AnimatePresence initial={false} custom={dir}>
               <motion.div
                 key={current + stack.length}
@@ -137,7 +138,8 @@ export default function App() {
                 initial="enter"
                 animate="center"
                 exit="exit"
-                transition={{ type: 'spring', stiffness: 380, damping: 40 }}
+                transition={pageTransition}
+                style={{ willChange: 'transform' }}
                 className="safe-top safe-x safe-bottom absolute inset-0 flex flex-col"
               >
                 {current === 'home' && (
@@ -194,7 +196,7 @@ function UpdateNotice({ inGame }: { inGame: boolean }) {
             className="card flex items-center gap-5 px-8 py-6"
             initial={{ scale: 0.6 }}
             animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 18 }}
+            transition={popSpring}
           >
             <motion.span className="text-6xl" animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 1, repeat: Infinity }}>
               ✨
