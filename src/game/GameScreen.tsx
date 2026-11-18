@@ -98,22 +98,26 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
       </AnimatePresence>
 
       {/* Pausa */}
-      <Modal open={status === 'paused' && !editing}>
-        <div className="mb-2 text-6xl">⏸️</div>
-        <h2 className="mb-6 text-3xl font-bold">Pausa</h2>
-        <div className="flex flex-col gap-3">
-          <CandyButton tone="mint" className="h-16 text-2xl" onClick={() => useRun.getState().set({ status: 'playing' })}>
-            ▶ Seguir jugando
-          </CandyButton>
-          <CandyButton tone="sky" className="h-14 text-xl" onClick={() => setRunKey((k) => k + 1)}>
-            🔄 Empezar de nuevo
-          </CandyButton>
-          <CandyButton tone="grape" className="h-14 text-xl" onClick={() => setEditing(true)}>
-            🕹️ Acomodar botones
-          </CandyButton>
-          <CandyButton tone="white" className="h-14 text-xl" onClick={onExit}>
-            🏠 Salir
-          </CandyButton>
+      <Modal open={status === 'paused' && !editing} wide>
+        <div className="flex items-center gap-6 short:gap-4">
+          <div className="flex w-[30%] shrink-0 flex-col items-center">
+            <div className="text-7xl short:text-5xl">⏸️</div>
+            <h2 className="mt-2 text-3xl font-bold short:text-2xl">Pausa</h2>
+          </div>
+          <div className="grid flex-1 grid-cols-2 gap-3 short:gap-2">
+            <CandyButton tone="mint" className="col-span-2 h-16 text-2xl short:h-12 short:text-xl" onClick={() => useRun.getState().set({ status: 'playing' })}>
+              ▶ Seguir jugando
+            </CandyButton>
+            <CandyButton tone="sky" className="h-14 text-lg short:h-11 short:text-base" onClick={() => setRunKey((k) => k + 1)}>
+              🔄 Otra vez
+            </CandyButton>
+            <CandyButton tone="grape" className="h-14 text-lg short:h-11 short:text-base" onClick={() => setEditing(true)}>
+              🕹️ Botones
+            </CandyButton>
+            <CandyButton tone="white" className="col-span-2 h-14 text-lg short:h-11 short:text-base" onClick={onExit}>
+              🏠 Salir al inicio
+            </CandyButton>
+          </div>
         </div>
       </Modal>
       <AnimatePresence>{editing && <ControlsEditor onClose={() => setEditing(false)} />}</AnimatePresence>
@@ -256,42 +260,46 @@ function ResultModal({ onAgain, onExit }: { onAgain: () => void; onExit: () => v
   return (
     <>
       {show && <Confetti />}
-      <Modal open={show && !!result}>
+      <Modal open={show && !!result} wide>
         {result && (
-          <>
+          <div className="flex items-center gap-6 short:gap-4">
+          <div className="flex w-[36%] shrink-0 flex-col items-center">
             <motion.div
-              className="mb-1 text-8xl"
+              className="text-8xl short:text-6xl"
               animate={{ rotate: [0, -10, 10, -6, 6, 0], scale: [1, 1.15, 1] }}
               transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 1 }}
             >
               {result.emoji}
             </motion.div>
-            <h2 className="text-3xl font-bold">{result.title}</h2>
-            <p className="mt-1 text-lg text-ink/70">¡Muy bien, {name}! 🎉</p>
-            <p className="mt-2 text-xl font-semibold">{result.subtitle}</p>
+            <h2 className="mt-2 text-3xl font-bold leading-tight short:text-2xl">{result.title}</h2>
+            <p className="mt-1 text-lg text-ink/70 short:text-base">¡Muy bien, {name}! 🎉</p>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col items-center">
+            <p className="text-xl font-semibold leading-snug short:text-base">{result.subtitle}</p>
             {result.record && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.4, type: 'spring' }}
-                className="mx-auto mt-3 w-fit rounded-full bg-sun px-4 py-1 text-lg font-bold text-[#5a3b00]"
+                className="mx-auto mt-2 w-fit rounded-full bg-sun px-4 py-1 text-lg font-bold text-[#5a3b00] short:text-base"
               >
                 🏅 ¡Nuevo récord!
               </motion.div>
             )}
-            <div className="mx-auto mt-4 flex w-fit items-center gap-3 rounded-3xl bg-[#fff6d6] px-6 py-3">
+            <div className="mx-auto mt-3 flex w-fit items-center gap-3 rounded-3xl bg-[#fff6d6] px-6 py-3 short:mt-2 short:py-2">
               <CoinIcon size={44} />
-              <span className="text-4xl font-bold">+{result.coins}</span>
+              <span className="text-4xl font-bold short:text-3xl">+{result.coins}</span>
             </div>
-            <div className="mt-6 flex gap-3">
-              <CandyButton tone="white" className="h-16 flex-1 text-xl" onClick={onExit}>
+            <div className="mt-5 flex w-full gap-3 short:mt-3">
+              <CandyButton tone="white" className="h-16 flex-1 text-xl short:h-12 short:text-lg" onClick={onExit}>
                 🏠 Salir
               </CandyButton>
-              <CandyButton tone="mint" className="h-16 flex-1 text-xl" onClick={onAgain}>
+              <CandyButton tone="mint" className="h-16 flex-1 text-xl short:h-12 short:text-lg" onClick={onAgain}>
                 🔄 Otra vez
               </CandyButton>
             </div>
-          </>
+          </div>
+          </div>
         )}
       </Modal>
     </>

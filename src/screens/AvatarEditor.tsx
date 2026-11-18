@@ -234,18 +234,21 @@ function BuyModal({
 }) {
   const enough = item ? coins >= item.price : false;
   return (
-    <Modal open={!!item} onClose={onClose}>
+    <Modal open={!!item} onClose={onClose} wide>
       {item && (
-        <>
+        <div className="flex items-center gap-6 short:gap-4">
+          <div className="flex w-[34%] shrink-0 flex-col items-center">
           <motion.div className="flex justify-center" animate={{ y: [0, -8, 0] }} transition={{ duration: 1.6, repeat: Infinity }}>
-            <ItemVisual item={item} size={110} />
+            <ItemVisual item={item} size={120} />
           </motion.div>
-          <h2 className="mt-2 text-3xl font-bold short:text-2xl">{item.name}</h2>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col items-center">
+          <h2 className="text-3xl font-bold short:text-2xl">{item.name}</h2>
           <div className="mx-auto mt-2 flex w-fit items-center gap-2 rounded-full bg-[#fff6d6] px-5 py-1.5 text-3xl font-bold short:text-2xl">
             <CoinIcon size={34} /> {item.price}
           </div>
           {enough ? (
-            <div className="mt-5 flex gap-3">
+            <div className="mt-5 flex w-full gap-3 short:mt-3">
               <CandyButton tone="white" className="h-14 flex-1 text-xl" onClick={onClose}>
                 Ahorita no
               </CandyButton>
@@ -258,7 +261,7 @@ function BuyModal({
               <p className="mt-3 text-xl text-ink/70" style={{ animation: 'shake 0.4s' }}>
                 Te faltan <b className="text-candy">{item.price - coins}</b> monedas 🥺 ¡Juega para ganar más!
               </p>
-              <div className="mt-5 flex gap-3">
+              <div className="mt-5 flex w-full gap-3 short:mt-3">
                 <CandyButton tone="white" className="h-14 flex-1 text-xl" onClick={onClose}>
                   Cerrar
                 </CandyButton>
@@ -275,7 +278,8 @@ function BuyModal({
               </div>
             </>
           )}
-        </>
+          </div>
+        </div>
       )}
     </Modal>
   );

@@ -11,18 +11,22 @@ export const JumpButtonView = forwardRef<HTMLDivElement, { size: number } & Reac
       <div
         ref={ref}
         {...rest}
-        className={`candy absolute flex flex-col items-center justify-center ${className}`}
-        style={{
-          width: size,
-          height: size,
-          background: 'linear-gradient(180deg,#ff7ab6,#ff4f98)',
-          ['--shade' as string]: '#d93d82',
-          touchAction: 'none',
-          ...style,
-        }}
+        className={`absolute ${className}`}
+        style={{ width: size, height: size, touchAction: 'none', ['--s' as string]: `${size}px`, ...style }}
       >
-        <span style={{ fontSize: size * 0.32, lineHeight: 1 }}>⬆</span>
-        <span style={{ fontSize: Math.max(11, size * 0.14) }}>¡Salta!</span>
+        <div className="jump-btn">
+          <svg width={size * 0.42} height={size * 0.36} viewBox="0 0 40 34" style={{ marginTop: -size * 0.04 }}>
+            <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 17 L20 6 L32 17" stroke="#8a1f52" strokeWidth="9" />
+              <path d="M8 29 L20 18 L32 29" stroke="#8a1f52" strokeWidth="9" />
+              <path d="M8 17 L20 6 L32 17" stroke="#ffffff" strokeWidth="5" />
+              <path d="M8 29 L20 18 L32 29" stroke="#ffffff" strokeWidth="5" opacity="0.85" />
+            </g>
+          </svg>
+          <span className="jump-label" style={{ fontSize: Math.max(11, size * 0.15), marginTop: size * 0.02 }}>
+            SALTAR
+          </span>
+        </div>
       </div>
     );
   },
@@ -126,7 +130,11 @@ export function TouchControls() {
     input.jump = true;
     input.jumpHeld = true;
     haptic(12);
-    jumpBtn.current?.animate([{ transform: 'scale(0.86)' }, { transform: 'scale(1)' }], { duration: 180 });
+    jumpBtn.current?.firstElementChild?.classList.add('pressed');
+  };
+  const release = () => {
+    input.jumpHeld = false;
+    jumpBtn.current?.firstElementChild?.classList.remove('pressed');
   };
 
   return (
@@ -139,8 +147,9 @@ export function TouchControls() {
         className="z-20"
         style={{ left: pos.jump.x - pos.jump.size / 2, top: pos.jump.y - pos.jump.size / 2 }}
         onPointerDown={jump}
-        onPointerUp={() => (input.jumpHeld = false)}
-        onPointerCancel={() => (input.jumpHeld = false)}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onPointerLeave={release}
       />
     </>
   );

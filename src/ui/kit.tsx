@@ -110,7 +110,7 @@ export function useCountUp(target: number, ms = 600) {
   return v;
 }
 
-export function Modal({ open, onClose, children }: { open: boolean; onClose?: () => void; children: React.ReactNode }) {
+export function Modal({ open, onClose, children, wide }: { open: boolean; onClose?: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <AnimatePresence>
       {open && (
@@ -122,7 +122,7 @@ export function Modal({ open, onClose, children }: { open: boolean; onClose?: ()
         >
           <div className="absolute inset-0 bg-[#33264d]/40 backdrop-blur-sm" onClick={onClose} />
           <motion.div
-            className="card no-scrollbar relative max-h-[calc(var(--app-h,100dvh)-24px)] w-full max-w-md overflow-y-auto p-6 text-center short:max-w-xl short:p-4"
+            className={`card no-scrollbar relative max-h-[calc(var(--app-h,100dvh)-24px)] w-full overflow-y-auto p-6 text-center short:p-4 ${wide ? 'max-w-[min(820px,92vw)]' : 'max-w-md short:max-w-xl'}`}
             initial={{ scale: 0.6, y: 40 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.8, opacity: 0 }}

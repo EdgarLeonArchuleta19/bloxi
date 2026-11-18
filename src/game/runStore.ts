@@ -53,3 +53,6 @@ export const useRun = create<RunState>()((set) => ({
   reset: () =>
     set({ status: 'countdown', coins: 0, time: 0, stars: 0, checkpoint: 0, lives: 3, round: 0, players: 8, banner: null, bar: 0, toast: null, result: null }),
 }));
+
+// solo en desarrollo: para pruebas automáticas
+if (import.meta.env.DEV) (window as unknown as { __run: typeof useRun }).__run = useRun;

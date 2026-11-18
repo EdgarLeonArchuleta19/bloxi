@@ -61,7 +61,7 @@ type PlayFn = (g: GameInfo, stage?: number) => void;
 
 export function GameSheet({ game, onClose, onPlay }: { game: GameInfo | null; onClose: () => void; onPlay: PlayFn }) {
   return (
-    <Modal open={!!game} onClose={onClose}>
+    <Modal open={!!game} onClose={onClose} wide>
       {game && <SheetBody game={game} onClose={onClose} onPlay={onPlay} />}
     </Modal>
   );
@@ -76,33 +76,37 @@ function SheetBody({ game, onClose, onPlay }: { game: GameInfo; onClose: () => v
       <button onClick={onClose} className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-xl font-bold shadow">
         ✕
       </button>
-      <div className="mx-auto w-[min(15rem,34vh)]">
+      <div className="flex items-center gap-6 text-left short:gap-4">
+      <div className="w-[min(40%,46vh)] shrink-0">
         <GameThumb game={game} rounded="rounded-[26px]" />
       </div>
-      <p className="mt-4 text-lg leading-snug text-ink/70 short:mt-2 short:text-base">{game.desc}</p>
-      <div className="mt-3 flex flex-wrap justify-center gap-2 text-base font-bold">
+      <div className="flex min-w-0 flex-1 flex-col gap-3 pr-10 short:gap-2">
+      <p className="text-lg leading-snug text-ink/70 short:text-base short:leading-tight">{game.desc}</p>
+      <div className="flex flex-wrap gap-2 text-base font-bold short:text-sm">
         <span className="rounded-full bg-[#e9f8f1] px-3 py-1 text-mint-dark">😊 {game.difficulty}</span>
         <span className="rounded-full bg-[#e8f5ff] px-3 py-1 text-sky-dark">⏱ {game.duration}</span>
         <span className="rounded-full bg-[#f1ebff] px-3 py-1 text-grape-dark">🏷️ {game.category}</span>
         {best && <span className="rounded-full bg-[#fff6d6] px-3 py-1 text-[#8a5a00]">🏅 {best}</span>}
       </div>
       {canContinue ? (
-        <div className="mt-5 flex flex-col gap-3 short:mt-3 short:flex-row">
-          <CandyButton tone="mint" className="h-16 w-full text-2xl short:h-14 short:text-xl" onClick={() => onPlay(game, obbyStage)}>
+        <div className="mt-1 flex flex-col gap-2.5">
+          <CandyButton tone="mint" className="h-16 w-full text-2xl short:h-12 short:text-lg" onClick={() => onPlay(game, obbyStage)}>
             ⏩ Seguir en etapa {obbyStage + 1}
           </CandyButton>
-          <CandyButton tone="white" className="h-14 w-full text-xl short:h-14" onClick={() => onPlay(game, 0)}>
+          <CandyButton tone="white" className="h-14 w-full text-xl short:h-11 short:text-base" onClick={() => onPlay(game, 0)}>
             ▶ Desde el inicio
           </CandyButton>
-          <p className="text-sm text-ink/50">
+          <p className="text-center text-sm text-ink/50">
             Llevas {obbyStage} de {OBBY_STAGES.length - 1} checkpoints 🚩 {OBBY_STAGES[obbyStage]?.emoji}
           </p>
         </div>
       ) : (
-        <CandyButton tone="mint" className="mt-5 h-16 w-full text-3xl short:mt-3 short:h-14 short:text-2xl" onClick={() => onPlay(game)}>
+        <CandyButton tone="mint" className="mt-1 h-16 w-full text-3xl short:h-12 short:text-xl" onClick={() => onPlay(game)}>
           ▶ ¡Jugar!
         </CandyButton>
       )}
+      </div>
+      </div>
     </>
   );
 }
