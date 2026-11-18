@@ -66,7 +66,7 @@ También tiene un botón **🎲 ¡Sorpréndeme!** que arma un outfit al azar.
 |---|---|
 | ☁️ **Obby en las Nubes** | Parkour de **8 etapas** en el cielo: escalones, plataformas que se mueven, trampolines, puente angosto, plataformas que desaparecen 👻, piedritas sobre lava 🔥, escalera al cielo con elevador y final arcoíris 🌈. Si te caes regresas al checkpoint, y **se guarda tu avance** para seguir otro día. |
 | ⭐ **Atrapa Estrellas** | 60 segundos para juntar estrellas en una isla con árboles, torres y trampolines. ¡Las estrellas arcoíris valen triple! |
-| 🎨 **Piso de Colores** | Sale un color y tienes que pararte en él antes de que los demás cuadros se caigan al agua. 15 rondas, cada vez más rápido, con 3 vidas ❤️❤️❤️. |
+| 🎨 **Piso de Colores** | ¡Contra 7 jugadores bot 🤖 con nombres y outfits al azar! Sale un color y hay que pararse en él antes de que los demás cuadros se caigan al agua. Gana quien quede al final (🥇🥈🥉). Tú tienes 3 vidas ❤️❤️❤️. Los bots son de mentiritas: todo pasa en el dispositivo. |
 
 <div align="center">
 <img src="docs/juego-obby.png" width="270" alt="Obby en las Nubes" />
@@ -85,9 +85,9 @@ El catálogo tiene **buscador y categorías**, así que está listo para muchos 
 
 > 💡 **Tip:** activa *Acceso guiado* (Ajustes → Accesibilidad) para que no pueda salirse de la app.
 
-Funciona en tablets y celulares, parados y acostados.
+Se juega **acostado (horizontal)** en tablets y celulares. Se navega todo desde el Inicio con botones de regresar (y el botón "atrás" de Android), y los botones del juego se pueden **mover y agrandar** en Ajustes.
 
-<img src="docs/celular.png" width="220" alt="Bloxi en celular" />
+<img src="docs/celular.png" width="520" alt="Bloxi en celular" />
 
 ## 💾 ¿Dónde se guarda el progreso?
 

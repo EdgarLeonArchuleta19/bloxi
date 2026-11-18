@@ -3,11 +3,11 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { GameId } from '../game/GameScreen';
 import { sfx } from '../lib/sound';
 import { useGame } from '../store';
-import { CoinPill } from '../ui/kit';
+import { CoinPill, ScreenHeader } from '../ui/kit';
 import { GameSheet, GameTile } from './GameCard';
 import { GAME_CATEGORIES, searchGames, type GameInfo } from './games';
 
-export function Play({ onPlay }: { onPlay: (id: GameId, stage?: number) => void }) {
+export function Play({ onPlay, onBack }: { onPlay: (id: GameId, stage?: number) => void; onBack: () => void }) {
   const coins = useGame((s) => s.coins);
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState('Todos');
@@ -15,15 +15,11 @@ export function Play({ onPlay }: { onPlay: (id: GameId, stage?: number) => void 
   const results = searchGames(query, cat);
 
   return (
-    <div className="flex h-full flex-col gap-3 short:gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-4xl font-bold max-sm:text-3xl short:text-2xl">🎮 Juegos</h1>
-        <CoinPill amount={coins} />
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <ScreenHeader title="🎮 Juegos" onBack={onBack}>
       {/* Buscador */}
-      <div className="relative">
-        <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-xl">🔍</span>
+      <div className="relative min-w-0 max-w-xl flex-1">
+        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl">🔍</span>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -32,7 +28,7 @@ export function Play({ onPlay }: { onPlay: (id: GameId, stage?: number) => void 
           autoCorrect="off"
           spellCheck={false}
           enterKeyHint="search"
-          className="h-14 w-full rounded-full border-4 border-transparent bg-white/95 pl-14 pr-14 text-xl font-semibold short:h-11 short:text-lg shadow-[0_5px_0_rgba(51,38,77,0.08)] outline-none placeholder:text-ink/30 focus:border-grape"
+          className="h-14 w-full rounded-full border-4 border-transparent bg-white/95 pl-12 pr-12 text-xl font-semibold shadow-[0_5px_0_rgba(51,38,77,0.08)] outline-none placeholder:text-ink/30 focus:border-grape short:h-11 short:text-lg"
         />
         {query && (
           <button
@@ -43,6 +39,8 @@ export function Play({ onPlay }: { onPlay: (id: GameId, stage?: number) => void 
           </button>
         )}
       </div>
+      <CoinPill amount={coins} className="max-sm:hidden" />
+      </ScreenHeader>
 
       {/* Categorías */}
       <div className="no-scrollbar -mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 pb-1">

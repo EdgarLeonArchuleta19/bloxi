@@ -239,3 +239,60 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) 
     </button>
   );
 }
+
+/** Botón redondo blanco (regresar, ajustes…) */
+export function RoundButton({ onClick, children, label }: { onClick: () => void; children: React.ReactNode; label: string }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.86 }}
+      aria-label={label}
+      onClick={() => {
+        sfx.tap();
+        onClick();
+      }}
+      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white text-2xl shadow-[0_5px_0_rgba(51,38,77,0.12)] short:h-11 short:w-11 short:text-xl"
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+export function BackIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#33264d" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 4 L7 12 L15 20" />
+    </svg>
+  );
+}
+
+/** Encabezado de pantalla: botón para regresar + título + algo a la derecha */
+export function ScreenHeader({ title, onBack, children }: { title: string; onBack: () => void; children?: React.ReactNode }) {
+  return (
+    <div className="flex shrink-0 items-center gap-3 pb-3 short:gap-2 short:pb-2">
+      <RoundButton onClick={onBack} label="Regresar">
+        <BackIcon />
+      </RoundButton>
+      <h1 className="min-w-0 shrink-0 truncate text-3xl font-bold short:text-2xl">{title}</h1>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2">{children}</div>
+    </div>
+  );
+}
+
+/** Bloxi se juega acostado: si la tablet está parada, pedimos girarla */
+export function RotateDevice() {
+  return (
+    <div className="fixed inset-0 z-[200] hidden flex-col items-center justify-center gap-6 bg-gradient-to-b from-[#a9dcff] to-[#ffe0f0] p-8 text-center portrait:flex">
+      <motion.div
+        className="flex h-40 w-24 items-center justify-center rounded-[22px] border-[6px] border-ink bg-white text-4xl shadow-[0_8px_0_rgba(51,38,77,0.15)]"
+        animate={{ rotate: [0, 0, -90, -90, 0] }}
+        transition={{ duration: 2.6, repeat: Infinity, times: [0, 0.25, 0.5, 0.85, 1], ease: 'easeInOut' }}
+      >
+        🧊
+      </motion.div>
+      <div>
+        <h2 className="text-3xl font-bold">¡Gira tu pantalla!</h2>
+        <p className="mt-1 text-xl text-ink/65">Bloxi se juega acostado 🔄</p>
+      </div>
+    </div>
+  );
+}

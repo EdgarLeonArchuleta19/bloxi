@@ -45,7 +45,7 @@ export const GAMES: GameInfo[] = [
   {
     id: 'colors',
     title: 'Piso de Colores',
-    desc: 'Sale un color y tienes que pararte en él antes de que los demás cuadros se caigan al agua. ¡Cada ronda va más rápido!',
+    desc: '¡Juega contra 7 jugadores más! Sale un color y tienes que pararte en él antes de que los demás cuadros se caigan al agua. Gana quien quede al final.',
     emoji: '🎨',
     thumb: 'thumbs/colors.jpg',
     gradient: 'linear-gradient(135deg,#7ae0b8 0%,#ff7ab6 100%)',

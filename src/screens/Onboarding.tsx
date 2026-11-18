@@ -4,31 +4,7 @@ import { sfx } from '../lib/sound';
 import { useGame, WELCOME_GIFT } from '../store';
 import { Showcase } from '../three/Showcase';
 import { CandyButton, CoinIcon, Confetti } from '../ui/kit';
-
-export function Logo({ size = 96 }: { size?: number }) {
-  const letters = ['B', 'l', 'o', 'x', 'i'];
-  const colors = ['#ff5fa2', '#ffcf33', '#3cb7f5', '#2fd39a', '#b07cff'];
-  return (
-    <div className="flex items-end justify-center" style={{ fontSize: size }}>
-      {letters.map((l, i) => (
-        <motion.span
-          key={i}
-          className="title-stroke font-bold leading-none"
-          style={{ color: colors[i], display: 'inline-block' }}
-          initial={{ y: -120, opacity: 0, rotate: -20 }}
-          animate={{ y: [0, -8, 0], opacity: 1, rotate: 0 }}
-          transition={{
-            y: { delay: 0.6 + i * 0.12, duration: 1.6, repeat: Infinity, repeatDelay: 1.5, ease: 'easeInOut' },
-            opacity: { delay: i * 0.08 },
-            rotate: { delay: i * 0.08, type: 'spring' },
-          }}
-        >
-          {l}
-        </motion.span>
-      ))}
-    </div>
-  );
-}
+import { Logo } from '../ui/Logo';
 
 export function Onboarding() {
   const [step, setStep] = useState<0 | 1>(0);
@@ -46,10 +22,10 @@ export function Onboarding() {
     <div className="safe-top safe-bottom safe-x relative flex h-full flex-col items-center justify-center gap-4 overflow-y-auto landscape:flex-row landscape:gap-10">
       <div className="flex flex-col items-center">
         <div className="short:hidden">
-          <Logo size={92} />
+          <Logo height={96} />
         </div>
         <div className="hidden short:block">
-          <Logo size={56} />
+          <Logo height={58} />
         </div>
         <Showcase config={avatar} className="h-[30vh] w-[320px] max-w-full landscape:h-[52vh] landscape:w-[min(380px,40vw)]" />
       </div>

@@ -4,9 +4,9 @@ import { ControlsEditor } from '../game/ControlsEditor';
 import { downloadBackup, loadBackup } from '../lib/backup';
 import { sfx } from '../lib/sound';
 import { useGame } from '../store';
-import { CandyButton, Modal, Toggle } from '../ui/kit';
+import { CandyButton, Modal, ScreenHeader, Toggle } from '../ui/kit';
 
-export function Settings() {
+export function Settings({ onBack }: { onBack: () => void }) {
   const name = useGame((s) => s.name);
   const sound = useGame((s) => s.sound);
   const [editName, setEditName] = useState(name);
@@ -15,10 +15,11 @@ export function Settings() {
   const customControls = useGame((s) => s.controls !== null);
 
   return (
-    <div className="no-scrollbar flex h-full flex-col gap-4 overflow-y-auto pb-2">
-      <h1 className="text-4xl font-bold max-sm:text-3xl short:text-2xl">⚙️ Ajustes</h1>
+    <div className="flex h-full min-h-0 flex-col">
+      <ScreenHeader title="⚙️ Ajustes" onBack={onBack} />
+      <div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-2">
 
-      <div className="grid gap-4 landscape:grid-cols-2">
+      <div className="grid gap-4 grid-cols-2 max-sm:grid-cols-1">
         <div className="card flex flex-col gap-4 p-5">
           <div className="text-xl font-bold">😊 Mi nombre</div>
           <div className="flex gap-3">
@@ -109,6 +110,7 @@ export function Settings() {
         </div>
       </div>
       <p className="text-center text-base text-ink/40">Bloxi v1.0 • Hecho con 💖</p>
+      </div>
 
       <ParentGate open={gate} onClose={() => setGate(false)} />
       <AnimatePresence>{editing && <ControlsEditor onClose={() => setEditing(false)} />}</AnimatePresence>

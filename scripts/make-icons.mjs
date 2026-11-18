@@ -20,28 +20,44 @@ const chunk = (type, data) => {
 };
 
 function pixel(u, v) {
-  // u,v en [0,1]
+  // u,v en [0,1]. Fondo: cielo -> rosita
   const mix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
-  let col = mix([126, 200, 255], [255, 158, 214], v); // cielo -> rosa
-  // cubo-cabeza
-  const hx = 0.5, hy = 0.5, hs = 0.3, r = 0.06;
-  const dx = Math.max(Math.abs(u - hx) - (hs - r), 0);
-  const dy = Math.max(Math.abs(v - hy) - (hs - r), 0);
-  const d = Math.hypot(dx, dy);
-  if (d < r + 0.018 && d >= r) col = [60, 40, 70];
-  if (d < r) {
-    col = [255, 214, 74];
-    if (u - hx + (v - hy) * 0.2 > 0.18) col = [238, 190, 50];
+  let col = mix([110, 196, 255], [255, 196, 228], v);
+  // rayitos de luz
+  const ang = Math.atan2(v - 0.5, u - 0.5);
+  if (Math.sin(ang * 8) > 0.6) col = mix(col, [255, 255, 255], 0.12);
+
+  // cubito inclinado -12°
+  const t = (12 * Math.PI) / 180;
+  const rot = (x, y) => [0.5 + (x - 0.5) * Math.cos(t) - (y - 0.5) * Math.sin(t), 0.5 + (x - 0.5) * Math.sin(t) + (y - 0.5) * Math.cos(t)];
+  const box = (x, y, cy, hs, r) => {
+    const dx = Math.max(Math.abs(x - 0.5) - (hs - r), 0);
+    const dy = Math.max(Math.abs(y - cy) - (hs - r), 0);
+    return Math.hypot(dx, dy) - r;
+  };
+  const [x, y] = rot(u, v);
+  const hs = 0.31, r = 0.075;
+  const ink = [51, 38, 77];
+  // sombra 3D
+  if (box(x, y, 0.535, hs, r) < 0) col = ink;
+  const d = box(x, y, 0.49, hs, r);
+  if (d < 0.02) col = ink;
+  if (d < 0) {
+    // degradado rosa -> morado
+    const k = Math.min(1, Math.max(0, (x - 0.19 + y - 0.18) / 1.25));
+    col = mix([255, 122, 182], [139, 92, 246], k);
+    // brillo
+    if (y < 0.27 && y > 0.235 && x > 0.27 && x < 0.6) col = mix(col, [255, 255, 255], 0.45);
     // ojos
-    for (const ex of [0.4, 0.6]) {
-      if (Math.hypot(u - ex, (v - 0.44) * 0.8) < 0.04) col = [40, 30, 50];
-      if (Math.hypot(u - ex + 0.012, v - 0.425) < 0.012) col = [255, 255, 255];
+    for (const ex of [0.39, 0.61]) {
+      if (Math.hypot((x - ex) / 0.055, (y - 0.46) / 0.07) < 1) col = ink;
+      if (Math.hypot(x - ex + 0.015, y - 0.435) < 0.02) col = [255, 255, 255];
     }
     // cachetes
-    for (const cx of [0.33, 0.67]) if (Math.hypot(u - cx, v - 0.55) < 0.035) col = [255, 140, 170];
+    for (const cx of [0.3, 0.7]) if (Math.hypot((x - cx) / 0.045, (y - 0.56) / 0.03) < 1) col = mix(col, [255, 209, 230], 0.8);
     // sonrisa
-    const sd = Math.hypot(u - 0.5, v - 0.52);
-    if (sd > 0.1 && sd < 0.13 && v > 0.55) col = [40, 30, 50];
+    const sd = Math.hypot(x - 0.5, y - 0.5);
+    if (sd > 0.085 && sd < 0.125 && y > 0.555 && Math.abs(x - 0.5) < 0.11) col = ink;
   }
   return col;
 }

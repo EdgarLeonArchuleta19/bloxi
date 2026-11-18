@@ -9,10 +9,13 @@ import { Bursts, Cloud, burst } from '../fx';
 import type { PlatformSpec, Solid } from '../physics';
 import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../PlayWorld';
 import { useRun } from '../runStore';
+import { BotsView, makeBots, planBots, updateBots } from './colorBots';
 
 // 🎨 Piso de Colores: sale un color y tienes que pararte en él antes de que los demás cuadros se caigan.
 
 export const COLOR_ROUNDS = 15;
+export const BOT_COUNT = 7;
+const PLACE_BONUS = [10, 6, 4];
 const COLORS = [
   { name: 'ROSA', hex: '#ff5fa2' },
   { name: 'AMARILLO', hex: '#ffd23f' },
@@ -49,6 +52,27 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
   const g = useRef({ phase: 'wait' as Phase, t: 1.2, dur: 1, round: 0, target: 0, fellThisRound: false, lastBar: -1 });
 
   const tiles = (): Solid[] => engine.current?.solids.slice(0, N * N) ?? [];
+  const tileCenter = (i: number) => new THREE.Vector3(((i % N) - 2) * STEP, 0, (Math.floor(i / N) - 2) * STEP);
+  const tileAt = (x: number, z: number): Solid | null => {
+    const c = Math.round(x / STEP) + 2, r = Math.round(z / STEP) + 2;
+    if (c < 0 || c >= N || r < 0 || r >= N) return null;
+    return tiles()[r * N + c] ?? null;
+  };
+
+  // 🤖 otros jugadores
+  const playerName = useGame((s) => s.name);
+  const bots = useMemo(() => {
+    const free = Array.from({ length: N * N }, (_, i) => i).filter((i) => i !== 12).sort(() => Math.random() - 0.5);
+    const spots = free.map((i) => tileCenter(i).add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0, (Math.random() - 0.5) * 1.6)));
+    const list = makeBots(BOT_COUNT, spots, playerName);
+    if (thumb) list.forEach((b, i) => {
+      b.anim.cheer = 999;
+      b.facing = Math.atan2(thumb.cam[0] - b.pos.x, thumb.cam[2] - b.pos.z) + (i % 2 ? 0.3 : -0.3);
+    });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const aliveBots = () => bots.filter((b) => !b.out).length;
 
   const startRound = () => {
     const s = g.current;
@@ -71,6 +95,7 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
     s.dur = Math.max(1.9, 4.6 - s.round * 0.2);
     s.t = s.dur;
     s.phase = 'show';
+    planBots(bots, s.round, s.target, cs, tileCenter);
     useRun.getState().set({ round: s.round, banner: { name: COLORS[s.target].name, color: COLORS[s.target].hex }, bar: 1 });
     sfx.count();
   };
@@ -79,18 +104,26 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
     const s = g.current;
     s.phase = 'over';
     const run = useRun.getState();
-    const survived = won ? COLOR_ROUNDS : Math.max(0, s.round - 1);
-    if (won) run.addCoins(10);
+    const survived = won ? s.round : Math.max(0, s.round - 1);
+    // lugar: si perdió, quedan delante los bots que siguen vivos
+    const place = won ? 1 : aliveBots() + 1;
+    const bonus = PLACE_BONUS[place - 1] ?? 0;
+    if (bonus) run.addCoins(bonus);
     const record = useGame.getState().setBestColors(survived);
-    if (engine.current) engine.current.anim.cheer = won ? 999 : 2;
+    if (engine.current) engine.current.anim.cheer = place <= 3 ? 999 : 2;
+    bots.forEach((b) => !b.out && !won && (b.anim.cheer = 999));
     sfx.win();
+    const medal = ['🥇', '🥈', '🥉'][place - 1];
     run.set({
       status: 'done',
       banner: null,
       result: {
-        emoji: won ? '🏆' : '🎨',
-        title: won ? '¡Ganaste todas las rondas!' : '¡Buen intento!',
-        subtitle: won ? `¡${COLOR_ROUNDS} rondas! +10 de premio` : `Aguantaste ${survived} ronda${survived === 1 ? '' : 's'}`,
+        emoji: medal ?? '🎨',
+        title: place === 1 ? '¡Primer lugar!' : place === 2 ? '¡Segundo lugar!' : place === 3 ? '¡Tercer lugar!' : '¡Buen intento!',
+        subtitle:
+          (place === 1 && aliveBots() === 0 ? '¡Fuiste la última en pie! ' : '') +
+          `Lugar ${place} de ${BOT_COUNT + 1} • ${survived} ronda${survived === 1 ? '' : 's'}` +
+          (bonus ? ` • +${bonus} de premio` : ''),
         coins: useRun.getState().coins,
         record,
       },
@@ -117,7 +150,18 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
     },
     onTick: (e, dt) => {
       const s = g.current;
-      if (thumb || s.phase === 'over' || useRun.getState().status !== 'playing') return;
+      if (thumb) return;
+      if (useRun.getState().status === 'playing' || s.phase === 'over') {
+        const splashed = updateBots(bots, dt, tileAt, HALF_GRID - 0.9);
+        if (splashed.length) {
+          splashed.forEach((b) => burst(b.pos.clone().setY(-3.5), '#7fd8ff', 14));
+          sfx.splash();
+          const run = useRun.getState();
+          run.set({ players: aliveBots() + 1 });
+          run.showToast(splashed.length === 1 ? `💦 ¡${splashed[0].name} se cayó!` : `💦 ¡Se cayeron ${splashed.length}!`);
+        }
+      }
+      if (s.phase === 'over' || useRun.getState().status !== 'playing') return;
       s.t -= dt;
       if (s.phase === 'wait' || s.phase === 'rest') {
         if (s.t <= 0) startRound();
@@ -143,7 +187,7 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
           sfx.coin();
           burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.4), '#ffd23f', 12);
         }
-        if (s.round >= COLOR_ROUNDS) return finish(true);
+        if (s.round >= COLOR_ROUNDS || aliveBots() === 0) return finish(true);
         if (s.round % 5 === 0) run.showToast(`¡Ronda ${s.round}! ¡Va más rápido! ⚡`);
         s.phase = 'rest';
         s.t = 0.7;
@@ -166,6 +210,7 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
         onEngine={(e) => (engine.current = e)}
       />
       <Tiles engine={engine} colors={colors} target={g} />
+      <BotsView bots={bots} />
       <Bursts />
       <Pool />
       <Balloons />

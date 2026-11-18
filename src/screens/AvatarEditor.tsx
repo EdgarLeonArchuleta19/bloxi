@@ -5,11 +5,11 @@ import { sfx } from '../lib/sound';
 import { useGame } from '../store';
 import { Showcase } from '../three/Showcase';
 import { ClothIcon } from '../ui/ClothIcon';
-import { CandyButton, CoinIcon, CoinPill, Confetti, Modal } from '../ui/kit';
+import { CandyButton, CoinIcon, CoinPill, Confetti, Modal, ScreenHeader } from '../ui/kit';
 
 const ALL_TABS = GROUPS.flatMap((g) => g.tabs);
 
-export function AvatarEditor({ onGoPlay, initialTab = 'outfit' }: { onGoPlay: () => void; initialTab?: string }) {
+export function AvatarEditor({ onGoPlay, onBack, initialTab = 'outfit' }: { onGoPlay: () => void; onBack: () => void; initialTab?: string }) {
   const avatar = useGame((s) => s.avatar);
   const coins = useGame((s) => s.coins);
   const [tabId, setTabId] = useState(initialTab);
@@ -47,12 +47,15 @@ export function AvatarEditor({ onGoPlay, initialTab = 'outfit' }: { onGoPlay: ()
   const items = tab.cat === 'skin' ? [] : ITEMS.filter((i) => i.cat === tab.cat && (!tab.sub || i.sub === tab.sub));
 
   return (
-    <div className="flex h-full flex-col gap-3 sm:gap-4 landscape:flex-row">
+    <div className="flex h-full min-h-0 flex-col">
+      <ScreenHeader title="👗 Mi Bloxi" onBack={onBack}>
+        <CoinPill amount={coins} />
+      </ScreenHeader>
+    <div className="flex min-h-0 flex-1 gap-3 sm:gap-4">
       {/* Vista previa */}
-      <div className="card relative shrink-0 overflow-hidden portrait:h-[34%] landscape:w-[40%]">
+      <div className="card relative w-[38%] shrink-0 overflow-hidden short:w-[34%]">
         <div className="absolute inset-0 bg-gradient-to-b from-[#e7f6ff] to-[#fff0f8]" />
         <Showcase config={avatar} cheerKey={cheer} zoom={1.05} className="absolute inset-0" />
-        <CoinPill amount={coins} className="absolute right-3 top-3 short:scale-90" />
         <div className="absolute inset-x-0 bottom-3 flex justify-center">
           <CandyButton
             tone="sun"
@@ -139,6 +142,7 @@ export function AvatarEditor({ onGoPlay, initialTab = 'outfit' }: { onGoPlay: ()
         </div>
       </div>
 
+    </div>
       <BuyModal item={buying} coins={coins} onClose={() => setBuying(null)} onBuy={confirmBuy} onGoPlay={onGoPlay} />
       {party > 0 && <Confetti key={party} count={50} />}
     </div>

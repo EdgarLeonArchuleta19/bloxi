@@ -124,7 +124,7 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
 }
 
 function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
-  const { status, coins, time, stars, checkpoint, lives, round } = useRun();
+  const { status, coins, time, stars, checkpoint, lives, round, players } = useRun();
   const low = id === 'stars' && time <= 10 && status === 'playing';
   return (
     <div className="safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3">
@@ -147,6 +147,8 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
             <span className="tabular-nums">
               Ronda {Math.max(1, round)}/{COLOR_ROUNDS}
             </span>
+            <span className="h-6 w-0.5 rounded bg-ink/15" />
+            <span className="tabular-nums">👥 {players}</span>
           </>
         ) : id === 'obby' ? (
           <>
@@ -219,7 +221,7 @@ function Toast() {
     return () => clearTimeout(t);
   }, [toast]);
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-[22%] z-30 flex justify-center">
+    <div className="pointer-events-none absolute inset-x-0 top-[34%] z-30 flex justify-center">
       <AnimatePresence>
         {visible && (
           <motion.div
