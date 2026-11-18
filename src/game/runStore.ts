@@ -17,6 +17,10 @@ interface RunState {
   time: number;
   stars: number;
   checkpoint: number;
+  lives: number;
+  round: number;
+  banner: { name: string; color: string } | null;
+  bar: number; // 0..1 tiempo restante de la ronda
   toast: { id: number; text: string } | null;
   result: RunResult | null;
   set: (p: Partial<RunState>) => void;
@@ -31,6 +35,10 @@ export const useRun = create<RunState>()((set) => ({
   time: 0,
   stars: 0,
   checkpoint: 0,
+  lives: 3,
+  round: 0,
+  banner: null,
+  bar: 0,
   toast: null,
   result: null,
   set: (p) => set(p),
@@ -40,5 +48,6 @@ export const useRun = create<RunState>()((set) => ({
     set((s) => ({ coins: s.coins + n }));
   },
   showToast: (text) => set({ toast: { id: Math.random(), text } }),
-  reset: () => set({ status: 'countdown', coins: 0, time: 0, stars: 0, checkpoint: 0, toast: null, result: null }),
+  reset: () =>
+    set({ status: 'countdown', coins: 0, time: 0, stars: 0, checkpoint: 0, lives: 3, round: 0, banner: null, bar: 0, toast: null, result: null }),
 }));

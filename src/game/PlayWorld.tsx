@@ -6,7 +6,7 @@ import { input } from '../lib/input';
 import { sfx } from '../lib/sound';
 import { Avatar, makeAnim, type AvatarAnim } from '../three/Avatar';
 import { mat, rbox } from '../three/shapes';
-import { Controller, makeSolids, updateMovers, type PlatformSpec, type Solid } from './physics';
+import { Controller, FADE_HOLD, makeSolids, updateFades, updateMovers, type PlatformSpec, type Solid } from './physics';
 import { useRun } from './runStore';
 
 export interface Engine {
@@ -96,7 +96,17 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       if (ctrl.pos.y < killY) hooks.current?.onFall?.(engine);
       hooks.current?.onTick?.(engine, dt);
 
+      updateFades(solids, ctrl.ground, dt);
       for (const s of solids) {
+        if (s.kind === 'fade' && s.obj) {
+          // tiembla antes de desaparecer y luego se encoge
+          const k = s.active ? 1 : 0;
+          const shake = s.active && s.fadeT > 0 ? Math.sin(clock.current * 60) * 0.08 * (s.fadeT / FADE_HOLD) : 0;
+          s.obj.position.set(s.center.x + shake, s.center.y, s.center.z);
+          const target = k;
+          const cur = s.obj.scale.x;
+          s.obj.scale.setScalar(cur + (target - cur) * (1 - Math.exp(-14 * dt)) || 0.001);
+        }
         if (s.squash > 0 && s.obj) {
           s.squash = Math.max(0, s.squash - dt * 3);
           s.obj.scale.y = 1 - Math.sin(s.squash * Math.PI) * 0.35;
@@ -172,15 +182,21 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       <group ref={player}>
         <Avatar config={avatar} anim={engine.anim} />
       </group>
-      {engine.solids.map((s, i) => (
-        <Platform key={i} solid={s} />
-      ))}
+      {engine.solids.map((s, i) => (s.spec.hidden ? null : <Platform key={i} solid={s} />))}
     </>
   );
 }
 
 function Platform({ solid }: { solid: Solid }) {
   const { s, color, kind } = solid.spec;
+  if (kind === 'lava') {
+    return (
+      <group ref={(o) => void (solid.obj = o)} position={solid.center}>
+        <mesh geometry={rbox(s[0], s[1], s[2], 0.2)} material={mat('#ff5a1f', { emissive: 0.75 })} />
+        <mesh geometry={rbox(s[0] - 1, 0.1, s[2] - 1, 0.05)} material={mat('#ffb23f', { emissive: 0.9 })} position={[0, s[1] / 2, 0]} />
+      </group>
+    );
+  }
   const top = useMemo(() => '#' + new THREE.Color(color).lerp(new THREE.Color('#ffffff'), 0.22).getHexString(), [color]);
   if (kind === 'bounce') {
     return (

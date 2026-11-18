@@ -7,7 +7,7 @@ import { CoinPill } from '../ui/kit';
 import { GameSheet, GameTile } from './GameCard';
 import { GAME_CATEGORIES, searchGames, type GameInfo } from './games';
 
-export function Play({ onPlay }: { onPlay: (id: GameId) => void }) {
+export function Play({ onPlay }: { onPlay: (id: GameId, stage?: number) => void }) {
   const coins = useGame((s) => s.coins);
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState('Todos');
@@ -88,7 +88,7 @@ export function Play({ onPlay }: { onPlay: (id: GameId) => void }) {
         </AnimatePresence>
       </div>
 
-      <GameSheet game={open} onClose={() => setOpen(null)} onPlay={(g) => onPlay(g.id)} />
+      <GameSheet game={open} onClose={() => setOpen(null)} onPlay={(g, st) => onPlay(g.id, st)} />
     </div>
   );
 }

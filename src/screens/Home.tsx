@@ -36,7 +36,7 @@ function Row({ title, action, onAction, children }: { title: string; action?: st
 export function Home({
   onPlay, onEdit, onAllGames,
 }: {
-  onPlay: (id: GameId) => void;
+  onPlay: (id: GameId, stage?: number) => void;
   onEdit: (tab?: 'outfit') => void;
   onAllGames: () => void;
 }) {
@@ -120,7 +120,7 @@ export function Home({
         </Row>
       </div>
 
-      <GameSheet game={open} onClose={() => setOpen(null)} onPlay={(g) => onPlay(g.id)} />
+      <GameSheet game={open} onClose={() => setOpen(null)} onPlay={(g, st) => onPlay(g.id, st)} />
     </div>
   );
 }

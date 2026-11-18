@@ -369,6 +369,205 @@ function Hair({ id, color }: { id: string; color: string }) {
           })}
         </>
       );
+    case 'ponytail':
+      return (
+        <>
+          {base}
+          <mesh material={mat('#ff5fa2')} position={[0, 0.3, -0.42]}>
+            <sphereGeometry args={[0.08, 12, 10]} />
+          </mesh>
+          {[[0.2, -0.5, 0.17], [0.0, -0.54, 0.16], [-0.2, -0.53, 0.14], [-0.38, -0.49, 0.11]].map(([y, z, r], i) => (
+            <mesh key={i} castShadow material={m} position={[0, y, z]} scale={[1, 1.35, 1]}>
+              <sphereGeometry args={[r, 14, 12]} />
+            </mesh>
+          ))}
+        </>
+      );
+    case 'sidepony':
+      return (
+        <>
+          {base}
+          <mesh material={mat('#b07cff')} position={[0.4, 0.26, -0.08]}>
+            <sphereGeometry args={[0.08, 12, 10]} />
+          </mesh>
+          {[[0.47, 0.12, 0.16], [0.52, -0.08, 0.15], [0.54, -0.28, 0.13], [0.52, -0.45, 0.1]].map(([x, y, r], i) => (
+            <mesh key={i} castShadow material={m} position={[x, y, -0.08]} scale={[1, 1.3, 1]}>
+              <sphereGeometry args={[r, 14, 12]} />
+            </mesh>
+          ))}
+        </>
+      );
+    case 'braids':
+      return (
+        <>
+          {base}
+          {[-1, 1].map((s) => (
+            <group key={s}>
+              {Array.from({ length: 7 }, (_, i) => {
+                const y = 0.02 - i * 0.11;
+                return (
+                  <mesh key={i} castShadow material={m} position={[s * (0.36 + (i % 2) * 0.02), y, y > -0.3 ? 0.06 : 0.25]}>
+                    <sphereGeometry args={[0.085, 10, 8]} />
+                  </mesh>
+                );
+              })}
+              <mesh material={mat('#ff5fa2')} position={[s * 0.37, -0.76, 0.25]}>
+                <sphereGeometry args={[0.06, 10, 8]} />
+              </mesh>
+            </group>
+          ))}
+        </>
+      );
+    case 'longbraid':
+      return (
+        <>
+          {base}
+          {Array.from({ length: 9 }, (_, i) => (
+            <mesh key={i} castShadow material={m} position={[(i % 2) * 0.03 - 0.015, 0.15 - i * 0.13, -0.43 - Math.sin(i * 0.3) * 0.03]}>
+              <sphereGeometry args={[0.11 - i * 0.004, 12, 10]} />
+            </mesh>
+          ))}
+          <mesh material={mat('#ff5fa2')} position={[0, -1.05, -0.43]}>
+            <sphereGeometry args={[0.07, 10, 8]} />
+          </mesh>
+        </>
+      );
+    case 'spacebuns':
+      return (
+        <>
+          {base}
+          {[-1, 1].map((s) => (
+            <group key={s}>
+              <mesh castShadow material={m} position={[s * 0.25, 0.5, -0.04]}>
+                <sphereGeometry args={[0.17, 16, 14]} />
+              </mesh>
+              <mesh material={mat('#ffd23f')} position={[s * 0.25, 0.4, -0.04]} rotation={[Math.PI / 2, 0, 0]}>
+                <torusGeometry args={[0.12, 0.03, 8, 18]} />
+              </mesh>
+            </group>
+          ))}
+        </>
+      );
+    case 'bob':
+      return (
+        <>
+          <mesh castShadow geometry={rbox(0.76, 0.18, 0.76, 0.08)} material={m} position={[0, 0.36, 0]} />
+          <mesh geometry={rbox(0.74, 0.16, 0.12, 0.05)} material={m} position={[0, 0.26, 0.31]} />
+          <mesh castShadow geometry={rbox(0.8, 0.66, 0.16, 0.07)} material={m} position={[0, 0.04, -0.33]} />
+          <mesh castShadow geometry={rbox(0.14, 0.66, 0.68, 0.06)} material={m} position={[-0.38, 0.04, -0.01]} />
+          <mesh castShadow geometry={rbox(0.14, 0.66, 0.68, 0.06)} material={m} position={[0.38, 0.04, -0.01]} />
+        </>
+      );
+    case 'wavy':
+      return (
+        <>
+          {base}
+          {Array.from({ length: 6 }, (_, i) => (
+            <mesh key={i} castShadow geometry={rbox(0.78, 0.22, 0.17, 0.08)} material={m} position={[Math.sin(i * 1.6) * 0.04, 0.2 - i * 0.18, -0.34 - Math.cos(i * 1.6) * 0.03]} />
+          ))}
+          {[-1, 1].flatMap((s) =>
+            Array.from({ length: 4 }, (_, i) => (
+              <mesh key={`${s}${i}`} geometry={rbox(0.13, 0.22, 0.4, 0.06)} material={m} position={[s * (0.38 + Math.sin(i * 1.7) * 0.03), 0.08 - i * 0.18, -0.12]} />
+            )),
+          )}
+        </>
+      );
+    case 'mermaid':
+      return (
+        <>
+          {base}
+          <mesh castShadow geometry={rbox(0.8, 1.7, 0.17, 0.08)} material={m} position={[0, -0.5, -0.34]} />
+          <mesh geometry={rbox(0.12, 1.0, 0.44, 0.05)} material={m} position={[-0.38, -0.2, -0.12]} />
+          <mesh geometry={rbox(0.12, 1.0, 0.44, 0.05)} material={m} position={[0.38, -0.2, -0.12]} />
+          <mesh geometry={starGeo()} material={mat('#ffd23f', { rough: 0.3 })} position={[0.36, 0.22, 0.2]} scale={0.22} rotation={[0, 0.5, 0.3]} />
+          {[-0.2, 0, 0.2].map((x) => (
+            <mesh key={x} material={mat('#ffffff', { rough: 0.2 })} position={[x, -0.2, -0.43]}>
+              <sphereGeometry args={[0.035, 8, 6]} />
+            </mesh>
+          ))}
+        </>
+      );
+    case 'curlylong':
+      return (
+        <>
+          {base}
+          {Array.from({ length: 15 }, (_, i) => {
+            const col = i % 3, row = Math.floor(i / 3);
+            return (
+              <mesh key={i} castShadow material={m} position={[(col - 1) * 0.25 + (row % 2) * 0.06, 0.15 - row * 0.19, -0.38]}>
+                <sphereGeometry args={[0.15, 12, 10]} />
+              </mesh>
+            );
+          })}
+          {[-1, 1].flatMap((s) =>
+            [0, 1, 2].map((r) => (
+              <mesh key={`${s}${r}`} material={m} position={[s * 0.4, 0.1 - r * 0.2, -0.1]}>
+                <sphereGeometry args={[0.13, 12, 10]} />
+              </mesh>
+            )),
+          )}
+        </>
+      );
+    case 'halfup':
+      return (
+        <>
+          {base}
+          <mesh castShadow geometry={rbox(0.76, 1.0, 0.16, 0.07)} material={m} position={[0, -0.16, -0.33]} />
+          <mesh geometry={rbox(0.12, 0.78, 0.42, 0.05)} material={m} position={[-0.37, -0.05, -0.12]} />
+          <mesh geometry={rbox(0.12, 0.78, 0.42, 0.05)} material={m} position={[0.37, -0.05, -0.12]} />
+          <mesh castShadow material={m} position={[0, 0.3, -0.45]}>
+            <sphereGeometry args={[0.13, 14, 12]} />
+          </mesh>
+          <group position={[0, 0.3, -0.56]}>
+            {[-1, 1].map((s) => (
+              <mesh key={s} material={mat('#ff5fa2')} position={[s * 0.13, 0, 0]} rotation={[0, 0, (s * Math.PI) / 2]}>
+                <coneGeometry args={[0.1, 0.18, 4]} />
+              </mesh>
+            ))}
+          </group>
+        </>
+      );
+    case 'puffs':
+      return (
+        <>
+          {base}
+          {[-1, 1].map((s) => (
+            <mesh key={s} castShadow material={m} position={[s * 0.32, 0.44, -0.06]}>
+              <sphereGeometry args={[0.24, 16, 14]} />
+            </mesh>
+          ))}
+        </>
+      );
+    case 'bangs':
+      return (
+        <>
+          {base}
+          <mesh castShadow geometry={rbox(0.76, 0.24, 0.13, 0.06)} material={m} position={[0, 0.22, 0.31]} />
+          <mesh castShadow geometry={rbox(0.76, 1.0, 0.16, 0.07)} material={m} position={[0, -0.16, -0.33]} />
+          <mesh geometry={rbox(0.12, 0.78, 0.42, 0.05)} material={m} position={[-0.37, -0.05, -0.12]} />
+          <mesh geometry={rbox(0.12, 0.78, 0.42, 0.05)} material={m} position={[0.37, -0.05, -0.12]} />
+        </>
+      );
+    case 'crownbraid':
+      return (
+        <>
+          {base}
+          <mesh castShadow geometry={rbox(0.76, 1.0, 0.16, 0.07)} material={m} position={[0, -0.16, -0.33]} />
+          {Array.from({ length: 16 }, (_, i) => {
+            const a = (i / 16) * Math.PI * 2;
+            return (
+              <mesh key={i} material={m} position={[Math.cos(a) * 0.37, 0.3, Math.sin(a) * 0.37]}>
+                <sphereGeometry args={[0.08, 10, 8]} />
+              </mesh>
+            );
+          })}
+          {[0.6, 1.4, 2.6].map((a, i) => (
+            <mesh key={a} material={mat(['#ffffff', '#ff7ab6', '#ffd23f'][i])} position={[Math.cos(a) * 0.4, 0.33, Math.sin(a) * 0.4]}>
+              <sphereGeometry args={[0.055, 10, 8]} />
+            </mesh>
+          ))}
+        </>
+      );
   }
   return base;
 }

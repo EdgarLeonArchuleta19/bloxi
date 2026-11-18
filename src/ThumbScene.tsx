@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { DEFAULT_AVATAR, type AvatarConfig } from './data/items';
+import { ColorFloorLevel } from './game/levels/ColorFloor';
 import { ObbyLevel } from './game/levels/Obby';
 import { StarIslandLevel } from './game/levels/StarIsland';
 import type { ThumbShot } from './game/PlayWorld';
@@ -12,6 +13,10 @@ const SHOTS: Record<string, { shot: ThumbShot; avatar: Partial<AvatarConfig> }> 
   obby: {
     shot: { player: [0.4, 2.4, 13.4], cam: [-3.4, 5.4, 7.2], look: [1.2, 4.4, 24] },
     avatar: { hat: 'bow', back: 'butterfly' },
+  },
+  colors: {
+    shot: { player: [0, 0, 4.35], cam: [-3.6, 6.2, 11.5], look: [0.4, 1.0, 0] },
+    avatar: { top: 'tee-dots', bottom: 'skirt-purple', hair: 'spacebuns', hairColor: '#ff6fae', face: 'happy' },
   },
   stars: {
     shot: { player: [0, 0, 7], cam: [0, 3.2, 13.5], look: [0, 1.6, 3] },
@@ -30,7 +35,9 @@ export function ThumbScene({ id }: { id: string }) {
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-[#8fd3ff] via-[#c4e7ff] to-[#ffe3f1]">
       <Canvas shadows flat dpr={1} gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }} camera={{ fov: 50, near: 0.1, far: 400 }}>
-        {id === 'stars' ? <StarIslandLevel avatar={avatar} thumb={cfg.shot} /> : <ObbyLevel avatar={avatar} thumb={cfg.shot} />}
+        {id === 'stars' && <StarIslandLevel avatar={avatar} thumb={cfg.shot} />}
+        {id === 'colors' && <ColorFloorLevel avatar={avatar} thumb={cfg.shot} />}
+        {id === 'obby' && <ObbyLevel avatar={avatar} thumb={cfg.shot} />}
       </Canvas>
     </div>
   );

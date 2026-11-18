@@ -6,13 +6,14 @@ import { sfx } from '../lib/sound';
 import { useGame } from '../store';
 import { CandyButton, CoinIcon, Confetti, Modal } from '../ui/kit';
 import { OBBY_CHECKPOINTS, ObbyLevel, formatTime } from './levels/Obby';
+import { COLOR_ROUNDS, ColorFloorLevel } from './levels/ColorFloor';
 import { STAR_TIME, StarIslandLevel } from './levels/StarIsland';
 import { useRun } from './runStore';
 import { TouchControls } from './TouchControls';
 
-export type GameId = 'obby' | 'stars';
+export type GameId = 'obby' | 'stars' | 'colors';
 
-export function GameScreen({ id, onExit }: { id: GameId; onExit: () => void }) {
+export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () => void; stage?: number }) {
   const avatar = useGame((s) => s.avatar);
   // limpiar la partida anterior ANTES del primer render (evita avisos viejos)
   useState(() => useRun.getState().reset());
@@ -26,6 +27,7 @@ export function GameScreen({ id, onExit }: { id: GameId; onExit: () => void }) {
     resetInput();
     useRun.getState().reset();
     if (id === 'stars') useRun.getState().set({ time: STAR_TIME });
+    if (id === 'obby') useRun.getState().set({ checkpoint: stage });
     const seq = [3, 2, 1, 0];
     const timers = seq.map((n, i) =>
       setTimeout(() => {
@@ -43,7 +45,7 @@ export function GameScreen({ id, onExit }: { id: GameId; onExit: () => void }) {
       timers.forEach(clearTimeout);
       clearTimeout(hide);
     };
-  }, [runKey, id]);
+  }, [runKey, id, stage]);
 
   // pausar si la app pasa a segundo plano
   useEffect(() => {
@@ -65,11 +67,14 @@ export function GameScreen({ id, onExit }: { id: GameId; onExit: () => void }) {
         camera={{ fov: 55, near: 0.1, far: 400, position: [0, 5, -10] }}
         className="!absolute inset-0"
       >
-        {id === 'obby' ? <ObbyLevel avatar={avatar} /> : <StarIslandLevel avatar={avatar} />}
+        {id === 'obby' && <ObbyLevel avatar={avatar} startStage={stage} />}
+        {id === 'stars' && <StarIslandLevel avatar={avatar} />}
+        {id === 'colors' && <ColorFloorLevel avatar={avatar} />}
       </Canvas>
 
       {status !== 'done' && <TouchControls />}
       <Hud id={id} onPause={() => useRun.getState().set({ status: 'paused' })} />
+      {id === 'colors' && <ColorBanner />}
       <Toast />
 
       {/* Cuenta regresiva */}
@@ -113,7 +118,7 @@ export function GameScreen({ id, onExit }: { id: GameId; onExit: () => void }) {
 }
 
 function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
-  const { status, coins, time, stars, checkpoint } = useRun();
+  const { status, coins, time, stars, checkpoint, lives, round } = useRun();
   const low = id === 'stars' && time <= 10 && status === 'playing';
   return (
     <div className="safe-top safe-x pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3">
@@ -129,7 +134,15 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
       </button>
 
       <div className="flex items-center gap-3 rounded-full bg-white/95 px-5 py-2 text-2xl font-bold shadow-[0_5px_0_rgba(51,38,77,0.12)] max-sm:gap-2 max-sm:px-3 max-sm:text-lg short:py-1 short:text-lg">
-        {id === 'obby' ? (
+        {id === 'colors' ? (
+          <>
+            <span className="tracking-tight">{'❤️'.repeat(Math.max(0, lives))}{'🤍'.repeat(Math.max(0, 3 - lives))}</span>
+            <span className="h-6 w-0.5 rounded bg-ink/15" />
+            <span className="tabular-nums">
+              Ronda {Math.max(1, round)}/{COLOR_ROUNDS}
+            </span>
+          </>
+        ) : id === 'obby' ? (
           <>
             <span>🚩 {checkpoint}/{OBBY_CHECKPOINTS}</span>
             <span className="h-6 w-0.5 rounded bg-ink/15" />
@@ -154,6 +167,38 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
         <CoinIcon size={34} />
         <span className="tabular-nums">+{coins}</span>
       </div>
+    </div>
+  );
+}
+
+/** Letrero gigante: "¡Párate en AZUL!" con barra de tiempo */
+function ColorBanner() {
+  const banner = useRun((s) => s.banner);
+  const bar = useRun((s) => s.bar);
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-[13%] z-30 flex justify-center px-4 short:top-[20%]">
+      <AnimatePresence>
+        {banner && (
+          <motion.div
+            key={banner.name + banner.color}
+            initial={{ scale: 0.4, opacity: 0, y: -20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.7, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 20 }}
+            className="flex flex-col items-center gap-2 rounded-[28px] bg-white/95 px-6 py-3 shadow-[0_6px_0_rgba(51,38,77,0.15)] short:py-2"
+          >
+            <div className="flex items-center gap-3 text-3xl font-bold max-sm:text-2xl short:text-2xl">
+              <span className="h-11 w-11 rounded-2xl border-4 border-white shadow-md short:h-8 short:w-8" style={{ background: banner.color }} />
+              <span>
+                ¡Párate en <span style={{ color: banner.color, WebkitTextStroke: '1.5px #33264d', paintOrder: 'stroke fill' }}>{banner.name}</span>!
+              </span>
+            </div>
+            <div className="h-3 w-full min-w-[220px] overflow-hidden rounded-full bg-ink/10">
+              <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${bar * 100}%`, background: banner.color }} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

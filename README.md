@@ -35,7 +35,7 @@ nadie y no se envía ningún dato a internet.
 
 ## 👗 El armario
 
-Casi **90 cosas** para vestir a tu Bloxi. Cada prenda tiene su propio color y diseño, hay **una gratis de cada tipo** y los
+Más de **100 cosas** para vestir a tu Bloxi. Cada prenda tiene su propio color y diseño, hay **una gratis de cada tipo** y los
 precios son bajitos.
 
 <div align="center">
@@ -51,7 +51,9 @@ princesa, superhéroe y astronauta.
 
 <img src="docs/ropa.png" alt="Combinaciones de ropa" />
 
-**👑 Y más:** 9 caras, 7 peinados con 10 colores, 11 gorros, 5 lentes y 7 cosas para la espalda (alas que aletean, capa, jetpack).
+**💇‍♀️ 20 peinados** (cola de caballo, trenzas, chonguitos, melenita, ondulado, corona trenzada, sirena súper largo…) con 16 colores de pelo.
+
+**👑 Y más:** 9 caras, 11 gorros, 5 lentes y 7 cosas para la espalda (alas que aletean, capa, jetpack).
 También tiene un botón **🎲 ¡Sorpréndeme!** que arma un outfit al azar.
 
 ## 🎮 Minijuegos
@@ -62,12 +64,14 @@ También tiene un botón **🎲 ¡Sorpréndeme!** que arma un outfit al azar.
 
 | Juego | De qué se trata |
 |---|---|
-| ☁️ **Obby en las Nubes** | Parkour en el cielo: plataformas que se mueven, trampolines, 3 checkpoints y un arcoíris en la meta. Si te caes, solo regresas al checkpoint. |
+| ☁️ **Obby en las Nubes** | Parkour de **8 etapas** en el cielo: escalones, plataformas que se mueven, trampolines, puente angosto, plataformas que desaparecen 👻, piedritas sobre lava 🔥, escalera al cielo con elevador y final arcoíris 🌈. Si te caes regresas al checkpoint, y **se guarda tu avance** para seguir otro día. |
 | ⭐ **Atrapa Estrellas** | 60 segundos para juntar estrellas en una isla con árboles, torres y trampolines. ¡Las estrellas arcoíris valen triple! |
+| 🎨 **Piso de Colores** | Sale un color y tienes que pararte en él antes de que los demás cuadros se caigan al agua. 15 rondas, cada vez más rápido, con 3 vidas ❤️❤️❤️. |
 
 <div align="center">
-<img src="docs/juego-obby.png" width="405" alt="Obby en las Nubes" />
-<img src="docs/juego-estrellas.png" width="405" alt="Atrapa Estrellas" />
+<img src="docs/juego-obby.png" width="270" alt="Obby en las Nubes" />
+<img src="docs/juego-estrellas.png" width="270" alt="Atrapa Estrellas" />
+<img src="docs/juego-colores.png" width="270" alt="Piso de Colores" />
 </div>
 
 El catálogo tiene **buscador y categorías**, así que está listo para muchos juegos más.
@@ -103,7 +107,7 @@ que descargar, y todo pesa ~1.5 MB.
 ```bash
 npm install
 npm run dev       # http://localhost:5173
-npm test          # un bot recorre el Obby con la física real para verificar que se puede terminar
+npm test          # un bot recorre las 8 etapas del Obby con la física real para verificar que se puede terminar
 npm run build     # genera /dist
 npm run thumbs    # con el dev server en :5199, toma capturas del juego para las portadas
 ```

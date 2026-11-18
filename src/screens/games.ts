@@ -19,15 +19,15 @@ export const GAMES: GameInfo[] = [
   {
     id: 'obby',
     title: 'Obby en las Nubes',
-    desc: 'Brinca de plataforma en plataforma, usa los trampolines y llega a la meta del arcoíris.',
+    desc: '8 etapas en el cielo: trampolines, plataformas que desaparecen, lava 🔥, elevadores y la meta del arcoíris. ¡Se guarda tu avance!',
     emoji: '☁️',
     thumb: 'thumbs/obby.jpg',
     gradient: 'linear-gradient(135deg,#6fd0ff 0%,#9b7bff 100%)',
     shade: '#6a4fd6',
     category: 'Aventura',
     tags: ['obby', 'saltos', 'parkour', 'nubes', 'aventura'],
-    difficulty: 'Fácil',
-    duration: '3 min',
+    difficulty: 'Medio',
+    duration: '6 min',
   },
   {
     id: 'stars',
@@ -41,6 +41,19 @@ export const GAMES: GameInfo[] = [
     tags: ['estrellas', 'isla', 'tiempo', 'correr', 'rapido'],
     difficulty: 'Fácil',
     duration: '1 min',
+  },
+  {
+    id: 'colors',
+    title: 'Piso de Colores',
+    desc: 'Sale un color y tienes que pararte en él antes de que los demás cuadros se caigan al agua. ¡Cada ronda va más rápido!',
+    emoji: '🎨',
+    thumb: 'thumbs/colors.jpg',
+    gradient: 'linear-gradient(135deg,#7ae0b8 0%,#ff7ab6 100%)',
+    shade: '#d9488a',
+    category: 'Fiesta',
+    tags: ['colores', 'piso', 'fiesta', 'rapido', 'baile', 'color block'],
+    difficulty: 'Fácil',
+    duration: '2 min',
   },
 ];
 

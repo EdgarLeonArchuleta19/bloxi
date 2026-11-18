@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs';
 
 const url = process.argv[2] ?? 'http://localhost:5199';
 const exe = process.argv[3] ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
-const games = ['obby', 'stars'];
+const games = ['obby', 'stars', 'colors'];
 
 mkdirSync('public/thumbs', { recursive: true });
 const browser = await chromium.launch({ executablePath: exe, args: ['--use-angle=d3d11', '--enable-unsafe-swiftshader'] });

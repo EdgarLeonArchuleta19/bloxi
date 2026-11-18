@@ -14,6 +14,8 @@ interface SaveState {
   avatar: AvatarConfig;
   bestObby: number | null; // segundos
   bestStars: number;
+  bestColors: number; // rondas
+  obbyStage: number; // etapa más lejana alcanzada en el obby
   sound: boolean;
   recent: string[]; // juegos jugados recientemente
   setName: (n: string) => void;
@@ -26,6 +28,8 @@ interface SaveState {
   markPlayed: (id: string) => void;
   setBestObby: (t: number) => boolean;
   setBestStars: (n: number) => boolean;
+  setBestColors: (n: number) => boolean;
+  setObbyStage: (n: number) => void;
   toggleSound: () => void;
   resetAll: () => void;
 }
@@ -37,6 +41,8 @@ const initial = {
   avatar: DEFAULT_AVATAR,
   bestObby: null as number | null,
   bestStars: 0,
+  bestColors: 0,
+  obbyStage: 0,
   sound: true,
   recent: [] as string[],
 };
@@ -111,6 +117,14 @@ export const useGame = create<SaveState>()(
         }
         return false;
       },
+      setBestColors: (n) => {
+        if (n > get().bestColors) {
+          set({ bestColors: n });
+          return true;
+        }
+        return false;
+      },
+      setObbyStage: (n) => set((s) => ({ obbyStage: Math.max(s.obbyStage, n) })),
       toggleSound: () => set((s) => ({ sound: !s.sound })),
       resetAll: () => set({ ...initial }),
     }),

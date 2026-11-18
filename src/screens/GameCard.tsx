@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { formatTime } from '../game/levels/Obby';
+import { OBBY_STAGES, formatTime } from '../game/levels/Obby';
 import { sfx } from '../lib/sound';
 import { useGame } from '../store';
 import { CandyButton, Modal } from '../ui/kit';
@@ -8,7 +8,9 @@ import type { GameInfo } from './games';
 export function useBest(game: GameInfo) {
   const bestObby = useGame((s) => s.bestObby);
   const bestStars = useGame((s) => s.bestStars);
+  const bestColors = useGame((s) => s.bestColors);
   if (game.id === 'obby') return bestObby !== null ? formatTime(bestObby) : null;
+  if (game.id === 'colors') return bestColors > 0 ? `${bestColors} rondas` : null;
   return bestStars > 0 ? `${bestStars} ⭐` : null;
 }
 
@@ -55,7 +57,9 @@ export function GameTile({ game, onOpen }: { game: GameInfo; onOpen: () => void 
 }
 
 /** Ficha del juego con el botón grande de Jugar */
-export function GameSheet({ game, onClose, onPlay }: { game: GameInfo | null; onClose: () => void; onPlay: (g: GameInfo) => void }) {
+type PlayFn = (g: GameInfo, stage?: number) => void;
+
+export function GameSheet({ game, onClose, onPlay }: { game: GameInfo | null; onClose: () => void; onPlay: PlayFn }) {
   return (
     <Modal open={!!game} onClose={onClose}>
       {game && <SheetBody game={game} onClose={onClose} onPlay={onPlay} />}
@@ -63,8 +67,10 @@ export function GameSheet({ game, onClose, onPlay }: { game: GameInfo | null; on
   );
 }
 
-function SheetBody({ game, onClose, onPlay }: { game: GameInfo; onClose: () => void; onPlay: (g: GameInfo) => void }) {
+function SheetBody({ game, onClose, onPlay }: { game: GameInfo; onClose: () => void; onPlay: PlayFn }) {
   const best = useBest(game);
+  const obbyStage = useGame((s) => s.obbyStage);
+  const canContinue = game.id === 'obby' && obbyStage > 0;
   return (
     <>
       <button onClick={onClose} className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-xl font-bold shadow">
@@ -80,9 +86,23 @@ function SheetBody({ game, onClose, onPlay }: { game: GameInfo; onClose: () => v
         <span className="rounded-full bg-[#f1ebff] px-3 py-1 text-grape-dark">🏷️ {game.category}</span>
         {best && <span className="rounded-full bg-[#fff6d6] px-3 py-1 text-[#8a5a00]">🏅 {best}</span>}
       </div>
-      <CandyButton tone="mint" className="mt-5 h-16 w-full text-3xl short:mt-3 short:h-14 short:text-2xl" onClick={() => onPlay(game)}>
-        ▶ ¡Jugar!
-      </CandyButton>
+      {canContinue ? (
+        <div className="mt-5 flex flex-col gap-3 short:mt-3 short:flex-row">
+          <CandyButton tone="mint" className="h-16 w-full text-2xl short:h-14 short:text-xl" onClick={() => onPlay(game, obbyStage)}>
+            ⏩ Seguir en etapa {obbyStage + 1}
+          </CandyButton>
+          <CandyButton tone="white" className="h-14 w-full text-xl short:h-14" onClick={() => onPlay(game, 0)}>
+            ▶ Desde el inicio
+          </CandyButton>
+          <p className="text-sm text-ink/50">
+            Llevas {obbyStage} de {OBBY_STAGES.length - 1} checkpoints 🚩 {OBBY_STAGES[obbyStage]?.emoji}
+          </p>
+        </div>
+      ) : (
+        <CandyButton tone="mint" className="mt-5 h-16 w-full text-3xl short:mt-3 short:h-14 short:text-2xl" onClick={() => onPlay(game)}>
+          ▶ ¡Jugar!
+        </CandyButton>
+      )}
     </>
   );
 }

@@ -23,9 +23,11 @@ export default function App() {
   const name = useGame((s) => s.name);
   const [tab, setTab] = useState<Tab>('home');
   const [game, setGame] = useState<GameId | null>(null);
+  const [stage, setStage] = useState(0);
 
   const screen = !name ? 'onboarding' : game ? 'game' : 'tabs';
-  const startGame = (id: GameId) => {
+  const startGame = (id: GameId, fromStage = 0) => {
+    setStage(fromStage);
     useGame.getState().markPlayed(id);
     setGame(id);
   };
@@ -48,7 +50,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <GameScreen id={game} onExit={() => setGame(null)} />
+            <GameScreen id={game} stage={stage} onExit={() => setGame(null)} />
           </motion.div>
         )}
         {screen === 'tabs' && (

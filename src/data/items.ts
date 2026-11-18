@@ -144,6 +144,19 @@ export const ITEMS: Item[] = [
   { id: 'bun', cat: 'hair', name: 'Chongo', emoji: '🍡', price: 5 },
   { id: 'spiky', cat: 'hair', name: 'Picudo', emoji: '⚡', price: 5 },
   { id: 'curly', cat: 'hair', name: 'Rizos', emoji: '🌀', price: 8 },
+  { id: 'ponytail', cat: 'hair', name: 'Cola de caballo', emoji: '🐴', price: 0 },
+  { id: 'braids', cat: 'hair', name: 'Dos trenzas', emoji: '🥨', price: 0 },
+  { id: 'spacebuns', cat: 'hair', name: 'Chonguitos', emoji: '🐼', price: 0 },
+  { id: 'bangs', cat: 'hair', name: 'Largo con fleco', emoji: '💇‍♀️', price: 5 },
+  { id: 'sidepony', cat: 'hair', name: 'Coleta de lado', emoji: '🎀', price: 5 },
+  { id: 'bob', cat: 'hair', name: 'Melenita', emoji: '👧', price: 5 },
+  { id: 'puffs', cat: 'hair', name: 'Puffs', emoji: '☁️', price: 5 },
+  { id: 'wavy', cat: 'hair', name: 'Ondulado', emoji: '🌊', price: 8 },
+  { id: 'halfup', cat: 'hair', name: 'Media cola con moño', emoji: '🎀', price: 8 },
+  { id: 'longbraid', cat: 'hair', name: 'Trenza larga', emoji: '🪢', price: 8 },
+  { id: 'curlylong', cat: 'hair', name: 'Rizos largos', emoji: '🌀', price: 10 },
+  { id: 'crownbraid', cat: 'hair', name: 'Corona trenzada', emoji: '👑', price: 10 },
+  { id: 'mermaid', cat: 'hair', name: 'Sirena (súper largo)', emoji: '🧜‍♀️', price: 12 },
 
   // Gorros 👑
   { id: 'none', cat: 'hat', name: 'Nada', emoji: '🚫', price: 0 },
@@ -224,7 +237,10 @@ export const GROUPS: { id: string; label: string; emoji: string; tabs: EditorTab
 ];
 
 export const SKIN_COLORS = ['#ffe3cc', '#f7c9a3', '#e8b088', '#c98e62', '#a0663f', '#6e4429', '#ffd84a', '#a8e6ff', '#c9b6ff', '#9ff0b8'];
-export const HAIR_COLORS = ['#2b1d14', '#6b3f22', '#b8743a', '#f2c94c', '#ff8c42', '#ff6fae', '#b07cff', '#3cb7f5', '#2fd39a', '#ffffff'];
+export const HAIR_COLORS = [
+  '#2b1d14', '#6b3f22', '#8a1c2b', '#b8743a', '#f2c94c', '#fff1a8', '#ff8c42', '#ff6fae',
+  '#ffb3d9', '#d9b8ff', '#b07cff', '#3cb7f5', '#a8e6ff', '#2fd39a', '#ffffff', '#9aa5b1',
+];
 
 /** Cómo cambia el cuerpo cada disfraz */
 export interface OutfitLook {

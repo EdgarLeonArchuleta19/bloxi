@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Física propia, sencilla y predecible: todo el mundo está hecho de cajas (AABB).
 // Más ligera que un motor de física completo y perfecta para un mundo de bloques.
 
-export type SolidKind = 'normal' | 'bounce' | 'checkpoint' | 'finish';
+export type SolidKind = 'normal' | 'bounce' | 'checkpoint' | 'finish' | 'fade' | 'lava';
 
 export interface MoveSpec {
   axis: 'x' | 'y' | 'z';
@@ -19,6 +19,7 @@ export interface PlatformSpec {
   kind?: SolidKind;
   move?: MoveSpec;
   index?: number; // número de checkpoint
+  hidden?: boolean; // el nivel la dibuja por su cuenta
 }
 
 export interface Solid {
@@ -32,6 +33,9 @@ export interface Solid {
   kind: SolidKind;
   obj: THREE.Object3D | null;
   squash: number; // animación de trampolín
+  active: boolean; // false = no existe (se cayó o desapareció)
+  fadeT: number; // tiempo parada encima (plataformas que desaparecen)
+  offT: number; // tiempo desaparecida
 }
 
 export function makeSolids(specs: PlatformSpec[]): Solid[] {
@@ -49,6 +53,9 @@ export function makeSolids(specs: PlatformSpec[]): Solid[] {
       kind: spec.kind ?? 'normal',
       obj: null,
       squash: 0,
+      active: true,
+      fadeT: 0,
+      offT: 0,
     };
   });
 }
@@ -64,6 +71,27 @@ export function updateMovers(solids: Solid[], t: number) {
     s.min.copy(s.center).sub(s.half);
     s.max.copy(s.center).add(s.half);
     if (s.obj) s.obj.position.copy(s.center);
+  }
+}
+
+/** Plataformas que desaparecen: aguantan ~1 s con alguien encima y vuelven a los 2.5 s */
+export const FADE_HOLD = 1.0;
+export function updateFades(solids: Solid[], ground: Solid | null, dt: number) {
+  for (const s of solids) {
+    if (s.kind !== 'fade') continue;
+    if (s.active) {
+      if (ground === s || s.fadeT > 0) s.fadeT += dt;
+      if (s.fadeT >= FADE_HOLD) {
+        s.active = false;
+        s.offT = 0;
+      }
+    } else {
+      s.offT += dt;
+      if (s.offT >= 2.5) {
+        s.active = true;
+        s.fadeT = 0;
+      }
+    }
   }
 }
 
@@ -101,6 +129,7 @@ export class Controller {
     const ev: StepEvents = { jumped: false, bounced: false, landedOn: null };
 
     // la plataforma en la que estoy parado me lleva con ella
+    if (this.ground && !this.ground.active) this.ground = null;
     if (this.ground) this.pos.add(this.ground.delta);
 
     const accel = this.grounded ? 16 : 7;
@@ -172,6 +201,7 @@ export class Controller {
   }
 
   private overlaps(s: Solid) {
+    if (!s.active) return false;
     const p = this.pos;
     return (
       p.x + HALF > s.min.x && p.x - HALF < s.max.x &&
