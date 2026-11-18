@@ -73,6 +73,7 @@ export function Onboarding() {
               placeholder="Escribe tu nombre"
               autoComplete="off"
               autoCorrect="off"
+              autoCapitalize="words"
               spellCheck={false}
               enterKeyHint="done"
               className="mt-5 h-16 w-full rounded-2xl border-4 border-[#e6dcff] bg-[#faf7ff] px-5 text-center text-3xl font-bold text-ink outline-none placeholder:text-ink/25 focus:border-grape"

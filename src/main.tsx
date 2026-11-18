@@ -7,12 +7,12 @@ import '@fontsource/fredoka/latin-700.css';
 import './index.css';
 import App from './App';
 import { mirrorSoon, requestPersistence, restoreIfNeeded } from './lib/backup';
+import { setupNativeFeel } from './lib/native';
 import { useGame } from './store';
 import { ThumbScene } from './ThumbScene';
 
-// Evita el zoom con gestos en iPad
-document.addEventListener('gesturestart', (e) => e.preventDefault());
-document.addEventListener('dblclick', (e) => e.preventDefault());
+// Sin zoom, sin menús de navegador, se acomoda al teclado, pantalla de carga…
+setupNativeFeel();
 
 const thumb = import.meta.env.DEV ? new URLSearchParams(location.search).get('thumb') : null;
 

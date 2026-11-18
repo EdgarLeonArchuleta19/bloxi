@@ -115,14 +115,14 @@ export function Modal({ open, onClose, children }: { open: boolean; onClose?: ()
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 short:p-2"
+          className="fixed inset-x-0 top-0 z-50 flex h-[var(--app-h,100dvh)] items-center justify-center p-4 short:p-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <div className="absolute inset-0 bg-[#33264d]/40 backdrop-blur-sm" onClick={onClose} />
           <motion.div
-            className="card no-scrollbar relative max-h-[calc(100dvh-24px)] w-full max-w-md overflow-y-auto p-6 text-center short:max-w-xl short:p-4"
+            className="card no-scrollbar relative max-h-[calc(var(--app-h,100dvh)-24px)] w-full max-w-md overflow-y-auto p-6 text-center short:max-w-xl short:p-4"
             initial={{ scale: 0.6, y: 40 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.8, opacity: 0 }}

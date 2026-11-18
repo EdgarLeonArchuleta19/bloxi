@@ -9,6 +9,7 @@ import { OBBY_CHECKPOINTS, ObbyLevel, formatTime } from './levels/Obby';
 import { COLOR_ROUNDS, ColorFloorLevel } from './levels/ColorFloor';
 import { STAR_TIME, StarIslandLevel } from './levels/StarIsland';
 import { useRun } from './runStore';
+import { ControlsEditor } from './ControlsEditor';
 import { TouchControls } from './TouchControls';
 
 export type GameId = 'obby' | 'stars' | 'colors';
@@ -19,6 +20,7 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
   useState(() => useRun.getState().reset());
   const [runKey, setRunKey] = useState(0);
   const [count, setCount] = useState<number | null>(3);
+  const [editing, setEditing] = useState(false);
   const status = useRun((s) => s.status);
 
   // reiniciar partida + cuenta regresiva
@@ -96,21 +98,25 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
       </AnimatePresence>
 
       {/* Pausa */}
-      <Modal open={status === 'paused'}>
+      <Modal open={status === 'paused' && !editing}>
         <div className="mb-2 text-6xl">⏸️</div>
         <h2 className="mb-6 text-3xl font-bold">Pausa</h2>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <CandyButton tone="mint" className="h-16 text-2xl" onClick={() => useRun.getState().set({ status: 'playing' })}>
             ▶ Seguir jugando
           </CandyButton>
           <CandyButton tone="sky" className="h-14 text-xl" onClick={() => setRunKey((k) => k + 1)}>
             🔄 Empezar de nuevo
           </CandyButton>
+          <CandyButton tone="grape" className="h-14 text-xl" onClick={() => setEditing(true)}>
+            🕹️ Acomodar botones
+          </CandyButton>
           <CandyButton tone="white" className="h-14 text-xl" onClick={onExit}>
             🏠 Salir
           </CandyButton>
         </div>
       </Modal>
+      <AnimatePresence>{editing && <ControlsEditor onClose={() => setEditing(false)} />}</AnimatePresence>
 
       <ResultModal onAgain={() => setRunKey((k) => k + 1)} onExit={onExit} />
     </div>

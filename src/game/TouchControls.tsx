@@ -1,33 +1,86 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
+import { defaultLayout, placeControls, useViewportSize } from '../lib/controlsLayout';
 import { input } from '../lib/input';
+import { haptic } from '../lib/native';
+import { useGame } from '../store';
 
-const R = 62; // radio del joystick
+/** Dibujo del botón de saltar (se usa en el juego y en el editor de botones) */
+export const JumpButtonView = forwardRef<HTMLDivElement, { size: number } & React.HTMLAttributes<HTMLDivElement>>(
+  function JumpButtonView({ size, style, className = '', ...rest }, ref) {
+    return (
+      <div
+        ref={ref}
+        {...rest}
+        className={`candy absolute flex flex-col items-center justify-center ${className}`}
+        style={{
+          width: size,
+          height: size,
+          background: 'linear-gradient(180deg,#ff7ab6,#ff4f98)',
+          ['--shade' as string]: '#d93d82',
+          touchAction: 'none',
+          ...style,
+        }}
+      >
+        <span style={{ fontSize: size * 0.32, lineHeight: 1 }}>⬆</span>
+        <span style={{ fontSize: Math.max(11, size * 0.14) }}>¡Salta!</span>
+      </div>
+    );
+  },
+);
 
-/** Joystick a la izquierda, arrastrar a la derecha para girar la cámara y botón grande de saltar */
+/** Dibujo del joystick */
+export const StickView = forwardRef<HTMLDivElement, { size: number; knobRef?: React.Ref<HTMLDivElement> } & React.HTMLAttributes<HTMLDivElement>>(
+  function StickView({ size, knobRef, style, className = '', ...rest }, ref) {
+    return (
+      <div
+        ref={ref}
+        {...rest}
+        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white/80 bg-white/25 backdrop-blur-sm ${className}`}
+        style={{ width: size, height: size, ...style }}
+      >
+        <div
+          ref={knobRef}
+          className="absolute left-1/2 top-1/2 rounded-full bg-white shadow-[0_4px_0_rgba(51,38,77,0.25)]"
+          style={{ width: size * 0.45, height: size * 0.45, transform: 'translate(-50%, -50%)' }}
+        />
+      </div>
+    );
+  },
+);
+
+/** Joystick, arrastrar para girar la cámara y botón de saltar, en la posición y tamaño que elija la niña */
 export function TouchControls() {
+  const { w, h } = useViewportSize();
+  const saved = useGame((s) => s.controls);
+  const layout = saved ?? defaultLayout(w, h);
+  const pos = placeControls(layout, w, h);
+  const R = layout.stickSize * 0.5; // qué tanto se mueve el joystick
+
   const base = useRef<HTMLDivElement>(null);
   const knob = useRef<HTMLDivElement>(null);
   const jumpBtn = useRef<HTMLDivElement>(null);
   const roles = useRef(new Map<number, { role: 'stick' | 'cam'; ox: number; oy: number; lx: number; ly: number }>());
+  const stickOnLeft = pos.stick.x < w / 2;
 
   const restStick = () => {
     const b = base.current;
     if (!b) return;
-    b.style.left = 'calc(max(env(safe-area-inset-left), 24px) + 84px)';
-    b.style.top = 'calc(100% - max(env(safe-area-inset-bottom), 24px) - 84px)';
+    b.style.left = `${pos.stick.x}px`;
+    b.style.top = `${pos.stick.y}px`;
     b.style.opacity = '0.55';
     if (knob.current) knob.current.style.transform = 'translate(-50%, -50%)';
   };
 
   useEffect(() => {
-    restStick();
-  }, []);
+    if (![...roles.current.values()].some((r) => r.role === 'stick')) restStick();
+  });
 
   const down = (e: React.PointerEvent) => {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    const isLeft = e.clientX < window.innerWidth * 0.45;
+    // el lado de la pantalla donde está el joystick sirve para caminar; el otro para girar la cámara
+    const inStickSide = stickOnLeft ? e.clientX < w * 0.45 : e.clientX > w * 0.55;
     const hasStick = [...roles.current.values()].some((r) => r.role === 'stick');
-    if (isLeft && !hasStick) {
+    if (inStickSide && !hasStick) {
       roles.current.set(e.pointerId, { role: 'stick', ox: e.clientX, oy: e.clientY, lx: e.clientX, ly: e.clientY });
       const b = base.current!;
       b.style.left = `${e.clientX}px`;
@@ -44,7 +97,10 @@ export function TouchControls() {
     if (r.role === 'stick') {
       let dx = e.clientX - r.ox, dy = e.clientY - r.oy;
       const len = Math.hypot(dx, dy);
-      if (len > R) { dx = (dx / len) * R; dy = (dy / len) * R; }
+      if (len > R) {
+        dx = (dx / len) * R;
+        dy = (dy / len) * R;
+      }
       input.moveX = dx / R;
       input.moveY = -dy / R;
       if (knob.current) knob.current.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
@@ -69,47 +125,23 @@ export function TouchControls() {
     e.stopPropagation();
     input.jump = true;
     input.jumpHeld = true;
+    haptic(12);
     jumpBtn.current?.animate([{ transform: 'scale(0.86)' }, { transform: 'scale(1)' }], { duration: 180 });
   };
 
   return (
     <>
-      <div
-        className="absolute inset-0 z-10"
-        style={{ touchAction: 'none' }}
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-      />
-      {/* Joystick */}
-      <div
-        ref={base}
-        className="pointer-events-none absolute z-20 h-[124px] w-[124px] -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white/80 bg-white/25 backdrop-blur-sm"
-      >
-        <div
-          ref={knob}
-          className="absolute left-1/2 top-1/2 h-14 w-14 rounded-full bg-white shadow-[0_4px_0_rgba(51,38,77,0.25)]"
-          style={{ transform: 'translate(-50%, -50%)' }}
-        />
-      </div>
-      {/* Botón de salto */}
-      <div
+      <div className="absolute inset-0 z-10" style={{ touchAction: 'none' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
+      <StickView ref={base} knobRef={knob} size={layout.stickSize} className="pointer-events-none z-20" style={{ left: pos.stick.x, top: pos.stick.y, opacity: 0.55 }} />
+      <JumpButtonView
         ref={jumpBtn}
+        size={pos.jump.size}
+        className="z-20"
+        style={{ left: pos.jump.x - pos.jump.size / 2, top: pos.jump.y - pos.jump.size / 2 }}
         onPointerDown={jump}
         onPointerUp={() => (input.jumpHeld = false)}
-        className="candy absolute z-20 flex h-28 w-28 flex-col items-center justify-center text-lg max-sm:h-24 max-sm:w-24 short:h-20 short:w-20 short:text-sm"
-        style={{
-          right: 'calc(max(env(safe-area-inset-right), 20px) + 8px)',
-          bottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 8px)',
-          background: 'linear-gradient(180deg,#ff7ab6,#ff4f98)',
-          ['--shade' as string]: '#d93d82',
-          touchAction: 'none',
-        }}
-      >
-        <span className="text-4xl leading-none">⬆</span>
-        <span className="text-base">¡Salta!</span>
-      </div>
+        onPointerCancel={() => (input.jumpHeld = false)}
+      />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { mirrorSoon, SAVE_KEY } from './lib/backup';
+import type { ControlsLayout } from './lib/controlsLayout';
 import {
   DEFAULT_AVATAR, HAIR_COLORS, ITEMS, OUTFIT_LOOKS, findItem, itemKey, type AvatarConfig, type Category,
 } from './data/items';
@@ -17,6 +18,7 @@ interface SaveState {
   bestColors: number; // rondas
   obbyStage: number; // etapa más lejana alcanzada en el obby
   sound: boolean;
+  controls: ControlsLayout | null; // null = acomodo automático
   recent: string[]; // juegos jugados recientemente
   setName: (n: string) => void;
   addCoins: (n: number) => void;
@@ -31,6 +33,7 @@ interface SaveState {
   setBestColors: (n: number) => boolean;
   setObbyStage: (n: number) => void;
   toggleSound: () => void;
+  setControls: (c: ControlsLayout | null) => void;
   resetAll: () => void;
 }
 
@@ -44,6 +47,7 @@ const initial = {
   bestColors: 0,
   obbyStage: 0,
   sound: true,
+  controls: null as ControlsLayout | null,
   recent: [] as string[],
 };
 
@@ -126,6 +130,7 @@ export const useGame = create<SaveState>()(
       },
       setObbyStage: (n) => set((s) => ({ obbyStage: Math.max(s.obbyStage, n) })),
       toggleSound: () => set((s) => ({ sound: !s.sound })),
+      setControls: (controls) => set({ controls }),
       resetAll: () => set({ ...initial }),
     }),
     {

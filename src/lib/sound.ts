@@ -1,5 +1,6 @@
 // Sonidos generados con WebAudio: cero archivos, funciona sin internet.
 import { useGame } from '../store';
+import { haptic } from './native';
 
 let ctx: AudioContext | null = null;
 
@@ -47,7 +48,10 @@ function tone(freq: number, dur: number, opts: { type?: OscillatorType; vol?: nu
 }
 
 export const sfx = {
-  tap: () => tone(660, 0.08, { type: 'triangle', vol: 0.12 }),
+  tap: () => {
+    haptic();
+    tone(660, 0.08, { type: 'triangle', vol: 0.12 });
+  },
   coin: () => {
     tone(988, 0.08, { type: 'square', vol: 0.06 });
     tone(1319, 0.18, { type: 'square', vol: 0.06, delay: 0.07 });

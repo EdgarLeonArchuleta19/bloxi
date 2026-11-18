@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { AnimatePresence } from 'motion/react';
+import { ControlsEditor } from '../game/ControlsEditor';
 import { downloadBackup, loadBackup } from '../lib/backup';
 import { sfx } from '../lib/sound';
 import { useGame } from '../store';
@@ -9,6 +11,8 @@ export function Settings() {
   const sound = useGame((s) => s.sound);
   const [editName, setEditName] = useState(name);
   const [gate, setGate] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const customControls = useGame((s) => s.controls !== null);
 
   return (
     <div className="no-scrollbar flex h-full flex-col gap-4 overflow-y-auto pb-2">
@@ -21,6 +25,12 @@ export function Settings() {
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value.slice(0, 14))}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="words"
+              spellCheck={false}
+              enterKeyHint="done"
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
               className="h-14 min-w-0 flex-1 rounded-2xl border-4 border-[#e6dcff] bg-[#faf7ff] px-4 text-2xl font-bold outline-none focus:border-grape"
             />
             <CandyButton
@@ -35,6 +45,15 @@ export function Settings() {
           <div className="flex items-center justify-between">
             <span className="text-xl font-bold">🔊 Sonidos</span>
             <Toggle on={sound} onChange={() => useGame.getState().toggleSound()} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xl font-bold">🕹️ Botones del juego</div>
+              <div className="text-base text-ink/55">{customControls ? 'Acomodados a tu gusto ✨' : 'Tamaño y lugar normal'}</div>
+            </div>
+            <CandyButton tone="grape" className="h-12 shrink-0 px-5 text-lg" onClick={() => setEditing(true)}>
+              Acomodar
+            </CandyButton>
           </div>
         </div>
 
@@ -92,6 +111,7 @@ export function Settings() {
       <p className="text-center text-base text-ink/40">Bloxi v1.0 • Hecho con 💖</p>
 
       <ParentGate open={gate} onClose={() => setGate(false)} />
+      <AnimatePresence>{editing && <ControlsEditor onClose={() => setEditing(false)} />}</AnimatePresence>
     </div>
   );
 }
