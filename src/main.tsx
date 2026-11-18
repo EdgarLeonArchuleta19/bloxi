@@ -8,6 +8,7 @@ import './index.css';
 import App from './App';
 import { mirrorSoon, requestPersistence, restoreIfNeeded } from './lib/backup';
 import { setupNativeFeel } from './lib/native';
+import { setupPWA } from './lib/pwa';
 import { useGame } from './store';
 import { ThumbScene } from './ThumbScene';
 
@@ -21,6 +22,7 @@ async function start() {
   if (!thumb && (await restoreIfNeeded())) await useGame.persist.rehydrate();
   mirrorSoon();
   requestPersistence();
+  if (!thumb) setupPWA();
   window.addEventListener('pointerdown', requestPersistence, { once: true });
 
   createRoot(document.getElementById('root')!).render(

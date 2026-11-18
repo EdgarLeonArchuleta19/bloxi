@@ -115,7 +115,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
           </button>
         </div>
       </div>
-      <p className="text-center text-base text-ink/40">Bloxi v1.0 • Hecho con 💖</p>
+      <p className="text-center text-base text-ink/40">
+        Bloxi • versión {new Date(__BUILD_TIME__).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })} • Hecho con 💖
+      </p>
       </div>
 
       <ParentGate open={gate} onClose={() => setGate(false)} />

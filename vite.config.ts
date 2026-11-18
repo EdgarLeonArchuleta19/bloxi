@@ -7,14 +7,21 @@ const GAME_NAME = 'Bloxi';
 
 export default defineConfig({
   base: './',
+  define: {
+    // fecha de la versión (se ve en Ajustes para saber si ya se actualizó)
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // 'prompt': nosotros decidimos cuándo actualizar (nunca a media partida)
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['icons/*.png', 'thumbs/*.jpg'],
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
         // Todo se guarda en el iPad: después de abrirlo una vez funciona sin internet
         globPatterns: ['**/*.{js,css,html,png,jpg,svg,woff2,webmanifest}'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,

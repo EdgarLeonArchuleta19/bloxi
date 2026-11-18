@@ -7,6 +7,7 @@ import { Home } from './screens/Home';
 import { Onboarding } from './screens/Onboarding';
 import { Play } from './screens/Play';
 import { Settings } from './screens/Settings';
+import { applyUpdate, useUpdate } from './lib/pwa';
 import { useGame } from './store';
 import { RotateDevice, SkyBackground } from './ui/kit';
 
@@ -118,7 +119,46 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      <UpdateNotice inGame={screen === 'game'} />
       <RotateDevice />
     </div>
+  );
+}
+
+/** Cuando hay versión nueva: avisar y actualizar solita (nunca a media partida) */
+function UpdateNotice({ inGame }: { inGame: boolean }) {
+  const ready = useUpdate((s) => s.ready);
+  const show = ready && !inGame;
+  useEffect(() => {
+    if (!show) return;
+    const t = setTimeout(applyUpdate, 1800);
+    return () => clearTimeout(t);
+  }, [show]);
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-[#33264d]/40 p-6 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="card flex items-center gap-5 px-8 py-6"
+            initial={{ scale: 0.6 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 18 }}
+          >
+            <motion.span className="text-6xl" animate={{ rotate: [0, 15, -15, 0] }} transition={{ duration: 1, repeat: Infinity }}>
+              ✨
+            </motion.span>
+            <div>
+              <div className="text-2xl font-bold">¡Bloxi tiene cosas nuevas!</div>
+              <div className="text-lg text-ink/60">Actualizando… tu progreso no se pierde 💖</div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
