@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ControlsEditor } from '../game/ControlsEditor';
 import { downloadBackup, loadBackup } from '../lib/backup';
-import { sfx } from '../lib/sound';
+import { sfx, wakeAudio } from '../lib/sound';
 import { useGame } from '../store';
 import { CandyButton, Modal, ScreenHeader, Toggle } from '../ui/kit';
 
@@ -45,7 +45,13 @@ export function Settings({ onBack }: { onBack: () => void }) {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xl font-bold">🔊 Sonidos</span>
-            <Toggle on={sound} onChange={() => useGame.getState().toggleSound()} />
+            <Toggle
+              on={sound}
+              onChange={() => {
+                useGame.getState().toggleSound();
+                if (useGame.getState().sound) wakeAudio();
+              }}
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div>

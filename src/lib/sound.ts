@@ -4,30 +4,98 @@ import { haptic } from './native';
 
 let ctx: AudioContext | null = null;
 
+// 1) iPhone/iPad: pedir sesión de audio tipo "reproducción" para que suene
+//    aunque el switch de silencio esté activado (Safari 17+).
+try {
+  const nav = navigator as Navigator & { audioSession?: { type: string } };
+  if (nav.audioSession) nav.audioSession.type = 'playback';
+} catch {
+  /* nada */
+}
+
 function ac(): AudioContext | null {
   if (!useGame.getState().sound) return null;
   try {
     if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+    // iOS a veces deja el audio "suspended" o "interrupted": lo despertamos
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
     return ctx;
   } catch {
     return null;
   }
 }
 
-// iOS solo deja sonar audio después de un toque
-const unlock = () => {
-  const c = ac();
-  if (c) {
-    const b = c.createBuffer(1, 1, 22050);
-    const s = c.createBufferSource();
-    s.buffer = b;
-    s.connect(c.destination);
-    s.start(0);
+// 2) Truco para iOS viejito: un <audio> en silencio y en loop pone el teléfono
+//    en modo "reproducción", y así WebAudio suena aunque esté en silencio.
+let silentEl: HTMLAudioElement | null = null;
+function silentWavUrl() {
+  const rate = 8000, n = rate / 2; // medio segundo de silencio
+  const buf = new ArrayBuffer(44 + n);
+  const v = new DataView(buf);
+  const str = (o: number, s: string) => [...s].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)));
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n, true);
+  str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true);
+  str(36, 'data');
+  v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+function startSilentLoop() {
+  try {
+    if (!silentEl) {
+      silentEl = document.createElement('audio');
+      silentEl.src = silentWavUrl();
+      silentEl.loop = true;
+      silentEl.setAttribute('playsinline', '');
+      silentEl.setAttribute('x-webkit-airplay', 'deny');
+      silentEl.preload = 'auto';
+    }
+    if (silentEl.paused) silentEl.play().catch(() => {});
+  } catch {
+    /* nada */
   }
-  window.removeEventListener('pointerdown', unlock);
+}
+
+// 3) iOS solo deja sonar después de un toque: lo intentamos en CADA toque
+//    hasta que el audio esté corriendo (antes solo se intentaba una vez).
+const unlock = () => {
+  if (!useGame.getState().sound) return;
+  startSilentLoop();
+  const c = ac();
+  if (!c) return;
+  const b = c.createBuffer(1, 1, 22050);
+  const s = c.createBufferSource();
+  s.buffer = b;
+  s.connect(c.destination);
+  s.start(0);
 };
-window.addEventListener('pointerdown', unlock);
+for (const ev of ['touchend', 'pointerup', 'click', 'keydown']) {
+  window.addEventListener(ev, () => {
+    if (!ctx || ctx.state !== 'running' || !silentEl || silentEl.paused) unlock();
+  }, { passive: true });
+}
+
+// 4) Al salir de la app se pausa todo; al regresar se reactiva solo
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    silentEl?.pause();
+  } else if (useGame.getState().sound) {
+    ctx?.resume().catch(() => {});
+  }
+});
+
+/** Al prender el sonido en Ajustes, despertar el audio de inmediato */
+export function wakeAudio() {
+  unlock();
+}
 
 function tone(freq: number, dur: number, opts: { type?: OscillatorType; vol?: number; delay?: number; slide?: number } = {}) {
   const c = ac();
@@ -72,3 +140,12 @@ export const sfx = {
   go: () => tone(1047, 0.35, { type: 'triangle', vol: 0.17 }),
   equip: () => tone(784, 0.1, { type: 'triangle', vol: 0.12, slide: 1175 }),
 };
+
+// Si apagan el sonido en Ajustes, apagamos también el truco de iOS
+useGame.subscribe((s, prev) => {
+  if (s.sound === prev.sound) return;
+  if (!s.sound) {
+    silentEl?.pause();
+    ctx?.suspend().catch(() => {});
+  }
+});
