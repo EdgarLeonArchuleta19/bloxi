@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* pantallas bajitas (celular acostado) */
+@custom-variant short (@media (max-height: 560px));
+/* tablets (parada o acostada) */
+@custom-variant tablet (@media (min-width: 740px) and (min-height: 600px));
+
+@theme {
+  --font-sans: "Fredoka", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --color-ink: #33264d;
+  --color-candy: #ff5fa2;
+  --color-candy-dark: #d93d82;
+  --color-grape: #8b5cf6;
+  --color-grape-dark: #6a3fd6;
+  --color-sun: #ffcf33;
+  --color-sun-dark: #e0a800;
+  --color-mint: #2fd39a;
+  --color-mint-dark: #18a874;
+  --color-sky: #3cb7f5;
+  --color-sky-dark: #1a8fd0;
+  --color-cream: #fff8ef;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: linear-gradient(180deg, #bfe6ff 0%, #ffe3f1 100%);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+canvas {
+  touch-action: none;
+  display: block;
+}
+
+.safe-top { padding-top: max(env(safe-area-inset-top), 14px); }
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 14px); }
+@media (max-height: 560px) {
+  .safe-top { padding-top: max(env(safe-area-inset-top), 8px); }
+  .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 6px); }
+}
+.safe-x {
+  padding-left: max(env(safe-area-inset-left), 16px);
+  padding-right: max(env(safe-area-inset-right), 16px);
+}
+
+/* Botón "caramelo": sombra sólida abajo que se aplasta al tocar */
+.candy {
+  border-radius: 9999px;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 6px 0 var(--shade), 0 10px 20px rgb(0 0 0 / 0.12);
+  text-shadow: 0 2px 0 rgb(0 0 0 / 0.15);
+  transition: transform 80ms, box-shadow 80ms;
+}
+.candy:active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--shade), 0 4px 10px rgb(0 0 0 / 0.1);
+}
+
+.card {
+  background: rgb(255 255 255 / 0.88);
+  border-radius: 28px;
+  box-shadow: 0 6px 0 rgb(51 38 77 / 0.08), 0 14px 30px rgb(51 38 77 / 0.1);
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+
+.title-stroke {
+  -webkit-text-stroke: 3px var(--color-ink);
+  paint-order: stroke fill;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.floaty { animation: floaty 3s ease-in-out infinite; }
+
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(18deg); }
+  20%, 40% { transform: rotate(-10deg); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+@keyframes drift {
+  from { transform: translateX(-30vw); }
+  to { transform: translateX(130vw); }
+}
