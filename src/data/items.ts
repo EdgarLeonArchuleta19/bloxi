@@ -50,6 +50,16 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   back: 'none',
 };
 
+/** Avatar inicial de niño (el de niña es DEFAULT_AVATAR) */
+export const BOY_AVATAR: AvatarConfig = {
+  ...DEFAULT_AVATAR,
+  hairColor: '#2b1d14',
+  top: 'tee-smile',
+  bottom: 'shorts-jean',
+  shoes: 'sneaker-white',
+  hair: 'short',
+};
+
 const top = (id: string, name: string, emoji: string, price: number, look: ClothLook): Item => ({ id, cat: 'top', name, emoji, price, look });
 const bot = (id: string, sub: Item['sub'], name: string, emoji: string, price: number, look: ClothLook): Item => ({
   id, cat: 'bottom', sub, name, emoji, price, look,

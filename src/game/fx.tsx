@@ -79,6 +79,10 @@ export function Bursts() {
   );
 }
 
+// ⚡ todas las nubes comparten la misma geometría y material
+const cloudGeo = new THREE.SphereGeometry(1, 12, 9);
+const cloudMat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
+
 /** Nubes esponjosas hechas de esferas */
 export function Cloud({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
   const ref = useRef<THREE.Group>(null);
@@ -90,10 +94,7 @@ export function Cloud({ position, scale = 1 }: { position: [number, number, numb
     <group ref={ref} position={position} scale={scale}>
       {[[0, 0, 0, 1.6], [1.5, -0.2, 0.3, 1.2], [-1.5, -0.3, 0, 1.1], [0.6, 0.6, -0.2, 1.1], [-0.6, 0.4, 0.4, 1]].map(
         ([x, y, z, r], i) => (
-          <mesh key={i} position={[x, y, z]}>
-            <sphereGeometry args={[r, 14, 12]} />
-            <meshLambertMaterial color="#ffffff" />
-          </mesh>
+          <mesh key={i} position={[x, y, z]} scale={r} geometry={cloudGeo} material={cloudMat} />
         ),
       )}
     </group>

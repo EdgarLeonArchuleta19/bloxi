@@ -6,7 +6,9 @@ import { sfx } from '../../lib/sound';
 import { useGame } from '../../store';
 import { mat } from '../../three/shapes';
 import { Bursts, Cloud, burst } from '../fx';
-import { PlayWorld, type LevelHooks, type ThumbShot } from '../PlayWorld';
+import { broadcast, netMode, onNetMessage, sendToHost, useRoom } from '../../net/room';
+import { NetSync, RemotePlayers } from '../../net/remote';
+import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../PlayWorld';
 import { useRun } from '../runStore';
 import { OBBY_CHECKPOINTS, OBBY_STAGES, buildObby } from './obbyData';
 import { Coins, type CoinData } from './pickups';
@@ -21,6 +23,54 @@ export function formatTime(t: number) {
 }
 
 export function ObbyLevel({ avatar, thumb, startStage = 0 }: { avatar: AvatarConfig; thumb?: ThumbShot; startStage?: number }) {
+  // en sala es una carrera: todos ven a todos y gana quien llegue primero
+  const mode = useMemo(() => (thumb ? 'solo' : netMode()), [thumb]);
+  const engine = useRef<Engine | null>(null);
+  const finishTime = useRef(0);
+  const placesGiven = useRef(0);
+  const PLACE_BONUS = [10, 6, 4];
+  const nameOf = (id: string) => useRoom.getState().players.find((p) => p.id === id)?.name ?? 'Alguien';
+
+  /** Mostrar mi resultado (en sala, con el lugar que me tocó) */
+  const showFinish = (place?: number) => {
+    const run = useRun.getState();
+    const time = finishTime.current;
+    const bonus = place ? PLACE_BONUS[place - 1] ?? 0 : 0;
+    if (bonus) run.addCoins(bonus);
+    const record = startStage === 0 ? useGame.getState().setBestObby(time) : false;
+    const medal = place ? ['🥇', '🥈', '🥉'][place - 1] : undefined;
+    run.set({
+      status: 'done',
+      result: {
+        emoji: medal ?? '🏆',
+        title: place ? (place === 1 ? '¡Ganaste la carrera!' : `¡Llegaste en ${place}° lugar!`) : '¡Llegaste a la meta!',
+        subtitle: `Tiempo: ${formatTime(time)}  •  +${FINISH_BONUS + bonus} de premio`,
+        coins: useRun.getState().coins,
+        record,
+      },
+    });
+  };
+
+  /** Anfitrión: reparte lugares conforme van llegando */
+  const givePlace = (id: string) => {
+    const place = ++placesGiven.current;
+    const name = id === useRoom.getState().myId ? useGame.getState().name : nameOf(id);
+    broadcast({ t: 'placed', id, name, place });
+    onPlaced(id, name, place);
+  };
+  const onPlaced = (id: string, name: string, place: number) => {
+    if (id === useRoom.getState().myId) showFinish(place);
+    else useRun.getState().showToast(`🏁 ¡${name} llegó ${place === 1 ? 'primero' : `en ${place}° lugar`}!`);
+  };
+
+  useEffect(() => {
+    if (mode === 'solo') return;
+    return onNetMessage((m, from) => {
+      if (mode === 'host' && m.t === 'finish') givePlace(from);
+      if (mode === 'guest' && m.t === 'placed') onPlaced(m.id, m.name, m.place);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
   const level = useMemo(buildObby, []);
   const coins = useMemo<CoinData[]>(() => level.coins.map((p) => ({ pos: new THREE.Vector3(...p), taken: false, t: 0 })), [level]);
   const checkpoints = useMemo(() => level.platforms.filter((p) => p.kind === 'checkpoint'), [level]);
@@ -58,23 +108,18 @@ export function ObbyLevel({ avatar, thumb, startStage = 0 }: { avatar: AvatarCon
         return;
       }
       if (s.kind === 'finish' && run.status === 'playing') {
-        const time = timeAcc.current;
+        finishTime.current = timeAcc.current;
         run.addCoins(FINISH_BONUS);
-        // el récord solo cuenta si empezó desde el principio
-        const record = startStage === 0 ? useGame.getState().setBestObby(time) : false;
         e.anim.cheer = 999;
         sfx.win();
         for (let k = 0; k < 4; k++) burst(finishPos.clone().add(new THREE.Vector3((k - 1.5) * 2, 3, 0)), '#ffcf33', 30);
-        run.set({
-          status: 'done',
-          result: {
-            emoji: '🏆',
-            title: '¡Llegaste a la meta!',
-            subtitle: `Tiempo: ${formatTime(time)}  •  +${FINISH_BONUS} de premio`,
-            coins: useRun.getState().coins,
-            record,
-          },
-        });
+        if (mode === 'solo') showFinish();
+        else {
+          // en sala: esperar a que el anfitrión diga en qué lugar llegué
+          run.set({ status: 'done' });
+          if (mode === 'host') givePlace(useRoom.getState().myId);
+          else sendToHost({ t: 'finish', time: finishTime.current });
+        }
       }
     },
     onFall: (e) => {
@@ -104,7 +149,22 @@ export function ObbyLevel({ avatar, thumb, startStage = 0 }: { avatar: AvatarCon
   return (
     <>
       <fog attach="fog" args={['#d7eeff', 45, 150]} />
-      <PlayWorld platforms={level.platforms} spawn={spawn} yaw={Math.PI} killY={-12} avatar={avatar} hooks={hooks} thumb={thumb} />
+      <PlayWorld
+        platforms={level.platforms}
+        spawn={spawn}
+        yaw={Math.PI}
+        killY={-12}
+        avatar={avatar}
+        hooks={hooks}
+        thumb={thumb}
+        onEngine={(e) => (engine.current = e)}
+      />
+      {mode !== 'solo' && (
+        <>
+          <NetSync engine={engine} />
+          <RemotePlayers />
+        </>
+      )}
       <Coins coins={coins} />
       <Bursts />
       <Flags checkpoints={checkpoints} />

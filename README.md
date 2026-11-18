@@ -5,7 +5,7 @@
 # Bloxi
 
 **Un mundo 3D de bloques para niños: arma tu monito, vístelo con disfraces chistosos y juega minijuegos.**
-Sin cuentas · Sin chat · Sin anuncios · Funciona sin internet
+Sin cuentas · Sin chat · Sin anuncios · Funciona sin internet · Salas privadas con amigos
 
 [![Publicar en GitHub Pages](https://github.com/EdgarLeonArchuleta19/bloxi/actions/workflows/deploy.yml/badge.svg)](https://github.com/EdgarLeonArchuleta19/bloxi/actions/workflows/deploy.yml)
 
@@ -28,9 +28,9 @@ nadie y no se envía ningún dato a internet.
 | | |
 |---|---|
 | 🚫 **Sin cuentas** | Solo pide un nombre para saludar, y se queda en el dispositivo |
-| 💬 **Sin chat ni multijugador** | Nadie desconocido puede hablarle |
+| 💬 **Sin chat** | Nadie puede escribirle. Para jugar con otros solo existen **salas privadas con código** (y los papás las pueden apagar) |
 | 💸 **Sin compras reales ni anuncios** | Las monedas solo se ganan jugando |
-| 📡 **Sin internet** | Después de abrirlo una vez funciona en modo avión |
+| 📡 **Sin internet** | Después de abrirlo una vez funciona en modo avión (solo las salas con amigos usan internet) |
 | 🔐 **Control para papás** | Borrar el progreso pide resolver una multiplicación |
 
 ## 👗 El armario
@@ -76,6 +76,22 @@ También tiene un botón **🎲 ¡Sorpréndeme!** que arma un outfit al azar.
 
 El catálogo tiene **buscador y categorías**, así que está listo para muchos juegos más.
 
+## 👫 Jugar con amigos (salas privadas)
+
+1. En el Inicio toca **👫 Amigos → Crear sala**. Sale un código como **PANDA-472** (se puede compartir con un toque).
+2. Tu amigo toca **👫 Amigos → Unirme** y escribe el código (o abre el link compartido).
+3. El anfitrión elige el juego y toca **¡Empezar!**
+
+| Juego en sala | Cómo se juega |
+|---|---|
+| 🎨 Piso de Colores | Todos en el mismo piso; gana el último en pie. Opción de **rellenar con bots** hasta 8 jugadores |
+| ⭐ Atrapa Estrellas | Todos compiten por las mismas estrellas; gana quien junte más. Opción de **rellenar con bots** hasta 5 |
+| ☁️ Carrera en el Obby | Se ven todos corriendo; gana quien llegue primero a la meta |
+
+- Hasta 8 jugadores. **Solo entra quien tenga el código**: no hay salas públicas ni chat.
+- Los dispositivos se conectan **directo entre ellos** (WebRTC con [PeerJS](https://peerjs.com)). Solo se comparte el nombre y el outfit del Bloxi con quienes están en la sala.
+- Los papás pueden apagar las salas en **Ajustes → Para papás**.
+
 ## 📲 Instalarlo en el iPad
 
 1. Abre **[edgarleonarchuleta19.github.io/bloxi](https://edgarleonarchuleta19.github.io/bloxi/)** en **Safari**.
@@ -101,7 +117,7 @@ El progreso se guarda **solo en el navegador del dispositivo** y está protegido
 ## 🛠️ Para desarrolladores
 
 Hecho con **React 19 + TypeScript + Vite**, **React Three Fiber** (3D), **Tailwind CSS**, **Motion** (animaciones),
-**Zustand** (estado) y **vite-plugin-pwa**. Los personajes, la ropa y los mundos se crean con código: no hay modelos ni imágenes
+**Zustand** (estado), **vite-plugin-pwa** y **PeerJS** (salas con amigos). Los personajes, la ropa y los mundos se crean con código: no hay modelos ni imágenes
 que descargar, y todo pesa ~1.5 MB.
 
 ```bash
@@ -124,6 +140,7 @@ Cada push a `main` se publica solo en GitHub Pages con [GitHub Actions](.github/
 | `src/game/` | Física, controles táctiles, HUD y niveles |
 | `src/screens/` | Bienvenida, Inicio, Juegos, Armario y Ajustes |
 | `src/lib/backup.ts` | Guardado doble y copias de seguridad |
+| `src/net/` | Salas privadas: conexión, sincronización y jugadores remotos |
 | `scripts/` | Íconos, portadas de juegos y prueba del Obby |
 
 </details>

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AvatarConfig } from '../../data/items';
@@ -7,7 +7,10 @@ import { useGame } from '../../store';
 import { mat } from '../../three/shapes';
 import { Bursts, Cloud, burst } from '../fx';
 import type { PlatformSpec } from '../physics';
-import { PlayWorld, type LevelHooks, type ThumbShot } from '../PlayWorld';
+import { broadcast, netMode, onNetMessage, sendToHost, useRoom } from '../../net/room';
+import { NetSync, RemotePlayers, type PosEntry } from '../../net/remote';
+import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../PlayWorld';
+import { BotsView, makeBots } from './colorBots';
 import { useRun } from '../runStore';
 import { Stars, type StarSlot } from './pickups';
 
@@ -51,9 +54,14 @@ function buildIsland() {
   return P;
 }
 
+type StarWire = [number, number, number, number, number]; // x, y, z, activa, arcoíris
+
 export function StarIslandLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: ThumbShot }) {
+  // solo · host (reparte estrellas y maneja bots) · guest (recibe estrellas)
+  const mode = useMemo(() => (thumb ? 'solo' : netMode()), [thumb]);
   const platforms = useMemo(buildIsland, []);
-  const spawn = useMemo(() => new THREE.Vector3(0, 0, 4), []);
+  const engine = useRef<Engine | null>(null);
+  const spawn = useMemo(() => (mode === 'solo' ? new THREE.Vector3(0, 0, 4) : new THREE.Vector3((Math.random() - 0.5) * 10, 0, 4 + Math.random() * 4)), [mode]);
   const slots = useMemo<StarSlot[]>(
     () => {
       const list = Array.from({ length: SLOTS }, () => ({ pos: new THREE.Vector3(), active: false, rainbow: false, age: 0 }));
@@ -73,6 +81,30 @@ export function StarIslandLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
   );
   const timeLeft = useRef(STAR_TIME);
   const lastBeep = useRef(99);
+  const scores = useRef(new Map<string, number>());
+  const dirty = useRef(true);
+  const sendAcc = useRef(0);
+  const over = useRef(false);
+
+  /** Altura del piso en un punto (para estrellas y bots) */
+  const groundTop = (x: number, z: number, pad = 0.6) => {
+    let top = 0;
+    for (const p of platforms) {
+      if (Math.abs(x - p.p[0]) < p.s[0] / 2 + pad && Math.abs(z - p.p[2]) < p.s[2] / 2 + pad) top = Math.max(top, p.p[1] + p.s[1] / 2);
+    }
+    return top;
+  };
+
+  // 🤖 bots del anfitrión
+  const bots = useMemo(() => {
+    if (mode !== 'host') return [];
+    const room = useRoom.getState();
+    const spots = room.botPlayers.map((_, i) => new THREE.Vector3(Math.cos(i * 1.7) * 6, 0, Math.sin(i * 1.7) * 6));
+    const list = makeBots(room.botPlayers.length, spots, '');
+    list.forEach((b, i) => Object.assign(b, { id: room.botPlayers[i].id, name: room.botPlayers[i].name, cfg: room.botPlayers[i].avatar, speed: 4.3 + Math.random() * 1.3 }));
+    return list;
+  }, [mode]);
+  const botTarget = useRef(new Map<string, number>());
 
   const placeStar = (slot: StarSlot, player: THREE.Vector3) => {
     for (let tries = 0; tries < 30; tries++) {
@@ -87,19 +119,162 @@ export function StarIslandLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
         x = (Math.random() - 0.5) * 42;
         z = (Math.random() - 0.5) * 42;
       }
-      let top = 0;
-      for (const p of platforms) {
-        if (Math.abs(x - p.p[0]) < p.s[0] / 2 + 0.6 && Math.abs(z - p.p[2]) < p.s[2] / 2 + 0.6) {
-          top = Math.max(top, p.p[1] + p.s[1] / 2);
-        }
-      }
+      const top = groundTop(x, z);
       if (Math.hypot(x - player.x, z - player.z) < 4) continue;
       if (slots.some((s) => s !== slot && s.active && Math.hypot(s.pos.x - x, s.pos.z - z) < 3)) continue;
       slot.pos.set(x, top + 1.2, z);
       slot.active = true;
       slot.rainbow = Math.random() < 0.12;
       slot.age = 0;
+      dirty.current = true;
       return;
+    }
+  };
+
+  /** Me tocaron estrellas (sumar monedas y puntos) */
+  const award = (v: number, at: THREE.Vector3, rainbow: boolean) => {
+    const run = useRun.getState();
+    sfx.star();
+    burst(at, rainbow ? '#ff5fa2' : '#ffd23f', rainbow ? 30 : 14);
+    run.addCoins(v);
+    run.set({ stars: useRun.getState().stars + v });
+    if (rainbow) run.showToast('¡Estrella arcoíris! +3 🌈');
+  };
+
+  const nameOf = (id: string) => {
+    const room = useRoom.getState();
+    return [...room.players, ...room.botPlayers].find((p) => p.id === id)?.name ?? 'Alguien';
+  };
+
+  /** Anfitrión: alguien agarró la estrella i (el primero que llega se la queda) */
+  const hostGrab = (id: string, i: number) => {
+    const s = slots[i];
+    if (!s?.active) return;
+    const v = s.rainbow ? 3 : 1;
+    s.active = false;
+    dirty.current = true;
+    const total = (scores.current.get(id) ?? 0) + v;
+    scores.current.set(id, total);
+    broadcast({ t: 'score', id, i, v, total });
+    if (id === useRoom.getState().myId) award(v, s.pos, s.rainbow);
+    else {
+      burst(s.pos, s.rainbow ? '#ff5fa2' : '#ffd23f', 10);
+      if (s.rainbow) useRun.getState().showToast(`🌈 ¡${nameOf(id)} atrapó la arcoíris!`);
+    }
+  };
+
+  /** Lugares por estrellas (empates comparten lugar) */
+  const ranking = () => {
+    const room = useRoom.getState();
+    const ids = [...room.players.map((p) => p.id), ...bots.map((b) => b.id)];
+    const list = ids.map((id) => ({ id, name: nameOf(id), score: scores.current.get(id) ?? 0 })).sort((a, b) => b.score - a.score);
+    return list.map((r) => ({ id: r.id, name: r.name, place: list.findIndex((x) => x.score === r.score) + 1 }));
+  };
+
+  const showResult = (place?: number, total?: number) => {
+    if (over.current) return;
+    over.current = true;
+    const run = useRun.getState();
+    const stars = run.stars;
+    const record = useGame.getState().setBestStars(stars);
+    const bonus = place ? [10, 6, 4][place - 1] ?? 0 : 0;
+    if (bonus) run.addCoins(bonus);
+    const e = engine.current;
+    if (e) {
+      e.anim.cheer = 999;
+      burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.5), '#ffd23f', 40);
+    }
+    sfx.win();
+    const medal = place ? ['🥇', '🥈', '🥉'][place - 1] : undefined;
+    run.set({
+      status: 'done',
+      time: 0,
+      result: {
+        emoji: medal ?? '⭐',
+        title: place ? (place === 1 ? '¡Ganaste!' : `¡Lugar ${place}!`) : '¡Se acabó el tiempo!',
+        subtitle:
+          `Atrapaste ${stars} estrella${stars === 1 ? '' : 's'}` +
+          (place ? ` • Lugar ${place} de ${total}` : '') +
+          (bonus ? ` • +${bonus} de premio` : ''),
+        coins: useRun.getState().coins,
+        record,
+      },
+    });
+  };
+
+  // 👫 mensajes de la sala
+  useEffect(() => {
+    if (mode === 'solo') return;
+    return onNetMessage((m, from) => {
+      if (mode === 'host') {
+        if (m.t === 'grab') hostGrab(from, m.i);
+        return;
+      }
+      if (m.t === 'stars') {
+        m.s.forEach((w, i) => {
+          const s = slots[i];
+          if (!s) return;
+          const wasActive = s.active;
+          s.pos.set(w[0], w[1], w[2]);
+          s.active = w[3] === 1;
+          s.rainbow = w[4] === 1;
+          if (s.active && !wasActive) s.age = 0;
+        });
+      } else if (m.t === 'score') {
+        const s = slots[m.i];
+        if (m.id === useRoom.getState().myId) award(m.v, s?.pos ?? new THREE.Vector3(), m.v === 3);
+        else {
+          if (s) burst(s.pos, m.v === 3 ? '#ff5fa2' : '#ffd23f', 10);
+          if (m.v === 3) useRun.getState().showToast(`🌈 ¡${nameOf(m.id)} atrapó la arcoíris!`);
+        }
+        if (s) s.active = false;
+      } else if (m.t === 'end') {
+        const mine = m.ranking.find((r) => r.id === useRoom.getState().myId);
+        showResult(mine?.place, m.ranking.length);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  /** Bots: van por la estrella más cercana y brincan si está alta */
+  const updateStarBots = (dt: number) => {
+    for (const b of bots) {
+      let ti = botTarget.current.get(b.id) ?? -1;
+      if (ti < 0 || !slots[ti]?.active || Math.random() < dt * 0.4) {
+        let best = -1, bd = Infinity;
+        slots.forEach((s, i) => {
+          if (!s.active) return;
+          const d = Math.hypot(s.pos.x - b.pos.x, s.pos.z - b.pos.z) * (0.8 + Math.random() * 0.4);
+          if (d < bd) {
+            bd = d;
+            best = i;
+          }
+        });
+        ti = best;
+        botTarget.current.set(b.id, ti);
+      }
+      const s = slots[ti];
+      let moving = false;
+      if (s?.active) {
+        const dx = s.pos.x - b.pos.x, dz = s.pos.z - b.pos.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.3) {
+          const step = Math.min(d, b.speed * dt);
+          b.pos.x += (dx / d) * step;
+          b.pos.z += (dz / d) * step;
+          let df = Math.atan2(dx, dz) - b.facing;
+          df = Math.atan2(Math.sin(df), Math.cos(df));
+          b.facing += df * (1 - Math.exp(-10 * dt));
+          moving = true;
+        }
+        // brincar si la estrella está arriba
+        const ground = groundTop(b.pos.x, b.pos.z, 0.2);
+        const wantY = d < 1.8 && s.pos.y - 1.1 > ground + 0.5 ? s.pos.y - 1.1 : ground;
+        b.pos.y += (wantY - b.pos.y) * (1 - Math.exp(-(wantY > b.pos.y ? 7 : 10) * dt));
+        if (b.pos.distanceTo(new THREE.Vector3(s.pos.x, s.pos.y - 1.1, s.pos.z)) < 1.5) hostGrab(b.id, ti);
+      }
+      b.anim.speed = moving ? 1 : 0;
+      b.anim.grounded = Math.abs(b.pos.y - groundTop(b.pos.x, b.pos.z, 0.2)) < 0.15;
     }
   };
 
@@ -113,9 +288,18 @@ export function StarIslandLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
     },
     onTick: (e, dt) => {
       const run = useRun.getState();
-      for (const s of slots) if (!s.active) placeStar(s, e.ctrl.pos);
+      if (mode !== 'guest') for (const s of slots) if (!s.active) placeStar(s, e.ctrl.pos);
+      if (mode === 'host') {
+        updateStarBots(dt);
+        sendAcc.current += dt;
+        if (dirty.current && sendAcc.current > 0.15) {
+          sendAcc.current = 0;
+          dirty.current = false;
+          broadcast({ t: 'stars', s: slots.map((s): StarWire => [Math.round(s.pos.x * 100) / 100, Math.round(s.pos.y * 100) / 100, Math.round(s.pos.z * 100) / 100, s.active ? 1 : 0, s.rainbow ? 1 : 0]) });
+        }
+      }
 
-      if (run.status !== 'playing') return;
+      if (run.status !== 'playing' || over.current) return;
       timeLeft.current = Math.max(0, timeLeft.current - dt);
       if (Math.ceil(timeLeft.current) !== Math.ceil(run.time)) run.set({ time: timeLeft.current });
       const sec = Math.ceil(timeLeft.current);
@@ -126,44 +310,46 @@ export function StarIslandLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
 
       const c = e.ctrl.pos.clone();
       c.y += 1.1;
-      for (const s of slots) {
-        if (s.active && s.pos.distanceTo(c) < 1.5) {
+      slots.forEach((s, i) => {
+        if (!s.active || s.pos.distanceTo(c) >= 1.5) return;
+        if (mode === 'solo') {
           s.active = false;
-          const v = s.rainbow ? 3 : 1;
-          sfx.star();
-          burst(s.pos, s.rainbow ? '#ff5fa2' : '#ffd23f', s.rainbow ? 30 : 14);
-          run.addCoins(v);
-          run.set({ stars: useRun.getState().stars + v });
-          if (s.rainbow) run.showToast('¡Estrella arcoíris! +3 🌈');
+          award(s.rainbow ? 3 : 1, s.pos, s.rainbow);
+        } else if (mode === 'host') hostGrab(useRoom.getState().myId, i);
+        else {
+          // invitado: la escondo ya y le pregunto al anfitrión si fui la primera
+          s.active = false;
+          sendToHost({ t: 'grab', i });
         }
-      }
+      });
 
       if (timeLeft.current <= 0) {
-        const stars = useRun.getState().stars;
-        const record = useGame.getState().setBestStars(stars);
-        e.anim.cheer = 999;
-        sfx.win();
-        burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.5), '#ffd23f', 40);
-        run.set({
-          status: 'done',
-          time: 0,
-          result: {
-            emoji: '⭐',
-            title: '¡Se acabó el tiempo!',
-            subtitle: `Atrapaste ${stars} estrella${stars === 1 ? '' : 's'}`,
-            coins: useRun.getState().coins,
-            record,
-          },
-        });
+        if (mode === 'solo') showResult();
+        else if (mode === 'host') {
+          const r = ranking();
+          broadcast({ t: 'end', ranking: r });
+          const mine = r.find((x) => x.id === useRoom.getState().myId);
+          showResult(mine?.place, r.length);
+        } else run.set({ time: 0 }); // el invitado espera los lugares del anfitrión
       }
     },
   };
 
+  const botEntries = (): PosEntry[] =>
+    bots.map((b) => [b.id, Math.round(b.pos.x * 100) / 100, Math.round(b.pos.y * 100) / 100, Math.round(b.pos.z * 100) / 100, Math.round(b.facing * 100) / 100, b.anim.speed, b.anim.grounded ? 1 : 0, 0]);
+
   return (
     <>
       <fog attach="fog" args={['#d7eeff', 50, 130]} />
-      <PlayWorld platforms={platforms} spawn={spawn} yaw={0} killY={-2.5} avatar={avatar} hooks={hooks} thumb={thumb} />
+      <PlayWorld platforms={platforms} spawn={spawn} yaw={0} killY={-2.5} avatar={avatar} hooks={hooks} thumb={thumb} onEngine={(e) => (engine.current = e)} />
       <Stars slots={slots} />
+      {mode === 'host' && <BotsView bots={bots} />}
+      {mode !== 'solo' && (
+        <>
+          <NetSync engine={engine} extra={mode === 'host' ? botEntries : undefined} />
+          <RemotePlayers />
+        </>
+      )}
       <Bursts />
       <Water />
       <Flowers />
@@ -191,22 +377,28 @@ function Water() {
   );
 }
 
+/** ⚡ 60 florecitas dibujadas de un jalón (InstancedMesh) */
 function Flowers() {
-  const list = useMemo(() => {
-    const out: { x: number; z: number; c: string }[] = [];
-    const cs = ['#ff7ab6', '#ffffff', '#ffcf33', '#b07cff'];
+  const ref = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const m = ref.current;
+    if (!m) return;
+    const cs = ['#ff7ab6', '#ffffff', '#ffcf33', '#b07cff'].map((c) => new THREE.Color(c));
+    const d = new THREE.Object3D();
     for (let i = 0; i < 60; i++) {
-      out.push({ x: (Math.random() - 0.5) * 44, z: (Math.random() - 0.5) * 44, c: cs[i % cs.length] });
+      d.position.set((Math.random() - 0.5) * 44, 0.1, (Math.random() - 0.5) * 44);
+      d.scale.set(1, 0.5, 1);
+      d.updateMatrix();
+      m.setMatrixAt(i, d.matrix);
+      m.setColorAt(i, cs[i % cs.length]);
     }
-    return out;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }, []);
   return (
-    <>
-      {list.map((f, i) => (
-        <mesh key={i} material={mat(f.c)} position={[f.x, 0.1, f.z]} scale={[1, 0.5, 1]}>
-          <sphereGeometry args={[0.12, 8, 6]} />
-        </mesh>
-      ))}
-    </>
+    <instancedMesh ref={ref} args={[undefined, undefined, 60]}>
+      <sphereGeometry args={[0.12, 8, 6]} />
+      <meshLambertMaterial />
+    </instancedMesh>
   );
 }

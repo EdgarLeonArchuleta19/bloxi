@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GameScreen, type GameId } from './game/GameScreen';
 import { useRun } from './game/runStore';
+import { leaveRoom, useRoom } from './net/room';
 import { AvatarEditor } from './screens/AvatarEditor';
+import { Friends } from './screens/Friends';
 import { Home } from './screens/Home';
 import { Onboarding } from './screens/Onboarding';
 import { Play } from './screens/Play';
@@ -11,7 +13,10 @@ import { applyUpdate, useUpdate } from './lib/pwa';
 import { useGame } from './store';
 import { RotateDevice, SkyBackground } from './ui/kit';
 
-type Screen = 'home' | 'play' | 'avatar' | 'settings';
+type Screen = 'home' | 'play' | 'avatar' | 'settings' | 'friends';
+
+// Link para entrar directo a una sala: ...?sala=PANDA472
+const linkCode = new URLSearchParams(location.search).get('sala') ?? '';
 
 // Transición tipo iOS: la pantalla nueva entra desde la derecha y la anterior se recorre un poquito
 const slide = {
@@ -31,7 +36,21 @@ export default function App() {
   gameRef.current = game;
 
   const current = stack[stack.length - 1];
-  const screen = !name ? 'onboarding' : game ? 'game' : 'app';
+  const roomStatus = useRoom((s) => s.status);
+  const roomInGame = useRoom((s) => s.inGame);
+  const roomGame = useRoom((s) => s.game);
+  const roomRun = useRoom((s) => s.run);
+  const netGame = roomStatus === 'playing' && roomInGame;
+  const screen = !name ? 'onboarding' : netGame ? 'net' : game ? 'game' : 'app';
+
+  // si llegaron con link de sala, abrir la pantalla de amigos
+  useEffect(() => {
+    if (name && linkCode && useGame.getState().allowRooms) {
+      history.replaceState({ bloxi: 0 }, '', location.pathname);
+      go('friends');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!name]);
 
   // Botón "atrás" del celular / gesto de regresar = navegar dentro de la app
   useEffect(() => {
@@ -42,7 +61,7 @@ export default function App() {
         setGame(null);
         return;
       }
-      if (gameRef.current) {
+      if (gameRef.current || (useRoom.getState().status === 'playing' && useRoom.getState().inGame)) {
         // en el juego, "atrás" pone pausa en vez de salir de golpe
         const run = useRun.getState();
         if (run.status === 'playing') run.set({ status: 'paused' });
@@ -95,6 +114,19 @@ export default function App() {
             <GameScreen id={game} stage={stage} onExit={exitGame} />
           </motion.div>
         )}
+        {screen === 'net' && (
+          <motion.div key={`net${roomRun}`} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+            <GameScreen
+              id={roomGame}
+              net
+              onExit={() => {
+                // salió de la sala: regresar al inicio
+                setDir(-1);
+                setStack(['home']);
+              }}
+            />
+          </motion.div>
+        )}
         {screen === 'app' && (
           <motion.div key="app" className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
             <AnimatePresence initial={false} custom={dir}>
@@ -109,17 +141,32 @@ export default function App() {
                 className="safe-top safe-x safe-bottom absolute inset-0 flex flex-col"
               >
                 {current === 'home' && (
-                  <Home onPlay={startGame} onEdit={() => go('avatar')} onAllGames={() => go('play')} onSettings={() => go('settings')} />
+                  <Home
+                    onPlay={startGame}
+                    onEdit={() => go('avatar')}
+                    onAllGames={() => go('play')}
+                    onSettings={() => go('settings')}
+                    onFriends={() => go('friends')}
+                  />
                 )}
                 {current === 'play' && <Play onPlay={startGame} onBack={back} />}
                 {current === 'avatar' && <AvatarEditor onBack={back} onGoPlay={() => go('play')} />}
                 {current === 'settings' && <Settings onBack={back} />}
+                {current === 'friends' && (
+                  <Friends
+                    initialCode={linkCode}
+                    onBack={() => {
+                      leaveRoom();
+                      back();
+                    }}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
-      <UpdateNotice inGame={screen === 'game'} />
+      <UpdateNotice inGame={screen === 'game' || screen === 'net'} />
       <RotateDevice />
     </div>
   );

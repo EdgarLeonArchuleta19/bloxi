@@ -13,6 +13,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const [gate, setGate] = useState(false);
   const [editing, setEditing] = useState(false);
   const customControls = useGame((s) => s.controls !== null);
+  const allowRooms = useGame((s) => s.allowRooms);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -77,11 +78,20 @@ export function Settings({ onBack }: { onBack: () => void }) {
         <div className="card flex flex-col gap-2 p-5 landscape:col-span-2">
           <div className="text-xl font-bold">👨‍👩‍👧 Para papás</div>
           <ul className="space-y-1 text-lg text-ink/75">
-            <li>✅ Sin cuentas, sin chat y sin otros jugadores.</li>
+            <li>✅ Sin cuentas y sin chat. Solo se juega con otros en salas privadas con código.</li>
             <li>✅ Sin anuncios ni compras con dinero real: las monedas solo se ganan jugando.</li>
             <li>✅ No envía ningún dato a internet: todo se guarda en este dispositivo.</li>
             <li>💡 Tip: usa “Acceso guiado” del iPad (Ajustes → Accesibilidad) para que no salga de la app.</li>
           </ul>
+          <div className="mt-3 flex items-center justify-between gap-4 rounded-2xl bg-[#f6f2fb] p-4">
+            <div>
+              <div className="text-lg font-bold">👫 Salas con amigos</div>
+              <p className="text-base text-ink/65">
+                Jugar con familia o amigos que tengan el código de la sala. Usa internet solo en ese modo. Apágalo si prefieres que solo juegue sola.
+              </p>
+            </div>
+            <Toggle on={allowRooms} onChange={() => useGame.getState().setAllowRooms(!allowRooms)} />
+          </div>
           <div className="mt-3 rounded-2xl bg-[#f6f2fb] p-4">
             <div className="text-lg font-bold">💾 Copia de seguridad</div>
             <p className="text-base text-ink/65">

@@ -19,6 +19,7 @@ interface SaveState {
   obbyStage: number; // etapa más lejana alcanzada en el obby
   sound: boolean;
   controls: ControlsLayout | null; // null = acomodo automático
+  allowRooms: boolean; // papás pueden apagar las salas con amigos
   recent: string[]; // juegos jugados recientemente
   setName: (n: string) => void;
   addCoins: (n: number) => void;
@@ -34,6 +35,7 @@ interface SaveState {
   setObbyStage: (n: number) => void;
   toggleSound: () => void;
   setControls: (c: ControlsLayout | null) => void;
+  setAllowRooms: (v: boolean) => void;
   resetAll: () => void;
 }
 
@@ -48,6 +50,7 @@ const initial = {
   obbyStage: 0,
   sound: true,
   controls: null as ControlsLayout | null,
+  allowRooms: true,
   recent: [] as string[],
 };
 
@@ -131,6 +134,7 @@ export const useGame = create<SaveState>()(
       setObbyStage: (n) => set((s) => ({ obbyStage: Math.max(s.obbyStage, n) })),
       toggleSound: () => set((s) => ({ sound: !s.sound })),
       setControls: (controls) => set({ controls }),
+      setAllowRooms: (allowRooms) => set({ allowRooms }),
       resetAll: () => set({ ...initial }),
     }),
     {

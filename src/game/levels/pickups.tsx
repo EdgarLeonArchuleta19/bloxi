@@ -36,7 +36,7 @@ export function Coins({ coins }: { coins: CoinData[] }) {
   return (
     <>
       {coins.map((c, i) => (
-        <mesh key={i} ref={(o) => void (refs.current[i] = o)} geometry={coinGeo} material={m} position={c.pos} castShadow />
+        <mesh key={i} ref={(o) => void (refs.current[i] = o)} geometry={coinGeo} material={m} position={c.pos} />
       ))}
     </>
   );

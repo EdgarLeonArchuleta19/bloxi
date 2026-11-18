@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AvatarConfig } from '../../data/items';
@@ -9,6 +9,8 @@ import { Bursts, Cloud, burst } from '../fx';
 import type { PlatformSpec, Solid } from '../physics';
 import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../PlayWorld';
 import { useRun } from '../runStore';
+import { broadcast, netMode, onNetMessage, sendToHost, useRoom } from '../../net/room';
+import { NetSync, RemotePlayers, type PosEntry } from '../../net/remote';
 import { BotsView, makeBots, planBots, updateBots } from './colorBots';
 
 // 🎨 Piso de Colores: sale un color y tienes que pararte en él antes de que los demás cuadros se caigan.
@@ -43,13 +45,18 @@ function buildFloor(): PlatformSpec[] {
 }
 
 type Phase = 'wait' | 'show' | 'drop' | 'rest' | 'over';
+type Ranking = { id: string; name: string; place: number }[];
 
 export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: ThumbShot }) {
+  // solo = contra bots · host = anfitrión de la sala (manda) · guest = invitado (obedece)
+  const mode = useMemo(() => (thumb ? 'solo' : netMode()), [thumb]);
   const platforms = useMemo(buildFloor, []);
-  const spawn = useMemo(() => new THREE.Vector3(0, 0, 0), []);
   const engine = useRef<Engine | null>(null);
   const colors = useRef<number[]>(Array.from({ length: N * N }, (_, i) => (i * 7 + 3) % 4));
   const g = useRef({ phase: 'wait' as Phase, t: 1.2, dur: 1, round: 0, target: 0, fellThisRound: false, lastBar: -1 });
+  const meOut = useRef(false);
+  const outOrder = useRef<string[]>([]); // anfitrión: orden en que se fueron eliminando
+  const humansOut = useRef(new Set<string>());
 
   const tiles = (): Solid[] => engine.current?.solids.slice(0, N * N) ?? [];
   const tileCenter = (i: number) => new THREE.Vector3(((i % N) - 2) * STEP, 0, (Math.floor(i / N) - 2) * STEP);
@@ -58,60 +65,126 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
     if (c < 0 || c >= N || r < 0 || r >= N) return null;
     return tiles()[r * N + c] ?? null;
   };
+  // en sala cada quien aparece en un cuadro distinto
+  const spawn = useMemo(() => (mode === 'solo' ? new THREE.Vector3(0, 0, 0) : tileCenter(Math.floor(Math.random() * N * N))), [mode]);
 
-  // 🤖 otros jugadores
+  // 🤖 bots (en solo: 7 al azar · anfitrión: los que eligió la sala · invitado: los ve como jugadores remotos)
   const playerName = useGame((s) => s.name);
   const bots = useMemo(() => {
+    if (mode === 'guest') return [];
+    const room = useRoom.getState();
+    const count = mode === 'host' ? room.botPlayers.length : BOT_COUNT;
     const free = Array.from({ length: N * N }, (_, i) => i).filter((i) => i !== 12).sort(() => Math.random() - 0.5);
     const spots = free.map((i) => tileCenter(i).add(new THREE.Vector3((Math.random() - 0.5) * 1.6, 0, (Math.random() - 0.5) * 1.6)));
-    const list = makeBots(BOT_COUNT, spots, playerName);
-    if (thumb) list.forEach((b, i) => {
-      b.anim.cheer = 999;
-      b.facing = Math.atan2(thumb.cam[0] - b.pos.x, thumb.cam[2] - b.pos.z) + (i % 2 ? 0.3 : -0.3);
-    });
+    const list = makeBots(count, spots, playerName);
+    if (mode === 'host') list.forEach((b, i) => Object.assign(b, { id: room.botPlayers[i].id, name: room.botPlayers[i].name, cfg: room.botPlayers[i].avatar }));
+    if (thumb)
+      list.forEach((b, i) => {
+        b.anim.cheer = 999;
+        b.facing = Math.atan2(thumb.cam[0] - b.pos.x, thumb.cam[2] - b.pos.z) + (i % 2 ? 0.3 : -0.3);
+      });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const aliveBots = () => bots.filter((b) => !b.out).length;
 
-  const startRound = () => {
+  /** Anfitrión: cuántos siguen en juego (personas + bots) */
+  const aliveCount = () => {
+    const room = useRoom.getState();
+    const humans = room.players.filter((p) => !humansOut.current.has(p.id)).length;
+    return humans + aliveBots();
+  };
+  const nameOf = (id: string) => {
+    const room = useRoom.getState();
+    return [...room.players, ...room.botPlayers].find((p) => p.id === id)?.name ?? 'Alguien';
+  };
+
+  /** Anfitrión: alguien quedó fuera (persona o bot) */
+  const markOut = (id: string, isBot: boolean) => {
+    if (outOrder.current.includes(id)) return;
+    outOrder.current.push(id);
+    if (!isBot) humansOut.current.add(id);
+    broadcast({ t: 'out', id });
+    const n = aliveCount();
+    useRun.getState().set({ players: n });
+    broadcast({ t: 'alive', n });
+  };
+
+  /** Aplica una ronda (el anfitrión la inventa; los invitados la reciben) */
+  const applyRound = (round: number, target: number, cs: number[], dur: number) => {
     const s = g.current;
-    s.round += 1;
+    s.round = round;
+    s.target = target;
     s.fellThisRound = false;
-    const k = Math.min(COLORS.length, 3 + Math.floor(s.round / 3));
-    s.target = Math.floor(Math.random() * k);
-    const cs = Array.from({ length: N * N }, () => Math.floor(Math.random() * k));
-    // asegurar 2-4 cuadros del color correcto, repartidos
-    const want = Math.max(2, 5 - Math.floor(s.round / 4));
-    let have = cs.filter((c) => c === s.target).length;
-    while (have < want) {
-      const i = Math.floor(Math.random() * cs.length);
-      if (cs[i] !== s.target) {
-        cs[i] = s.target;
-        have++;
-      }
-    }
     colors.current = cs;
-    s.dur = Math.max(1.9, 4.6 - s.round * 0.2);
-    s.t = s.dur;
+    s.dur = dur;
+    s.t = dur;
     s.phase = 'show';
-    planBots(bots, s.round, s.target, cs, tileCenter);
-    useRun.getState().set({ round: s.round, banner: { name: COLORS[s.target].name, color: COLORS[s.target].hex }, bar: 1 });
+    tiles().forEach((t) => (t.active = true));
+    useRun.getState().set({ round, banner: { name: COLORS[target].name, color: COLORS[target].hex }, bar: 1 });
     sfx.count();
   };
 
-  const finish = (won: boolean) => {
+  const startRound = () => {
     const s = g.current;
+    const round = s.round + 1;
+    const k = Math.min(COLORS.length, 3 + Math.floor(round / 3));
+    const target = Math.floor(Math.random() * k);
+    const cs = Array.from({ length: N * N }, () => Math.floor(Math.random() * k));
+    // asegurar varios cuadros del color correcto (más en sala porque hay más jugadores)
+    const want = Math.max(mode === 'solo' ? 2 : 3, 5 - Math.floor(round / 4));
+    let have = cs.filter((c) => c === target).length;
+    while (have < want) {
+      const i = Math.floor(Math.random() * cs.length);
+      if (cs[i] !== target) {
+        cs[i] = target;
+        have++;
+      }
+    }
+    const dur = Math.max(1.9, 4.6 - round * 0.2);
+    applyRound(round, target, cs, dur);
+    planBots(bots, round, target, cs, tileCenter);
+    if (mode === 'host') broadcast({ t: 'round', round, target, colors: cs, dur });
+  };
+
+  const applyDrop = () => {
+    const s = g.current;
+    tiles().forEach((t, i) => (t.active = colors.current[i] === s.target));
+    s.phase = 'drop';
+    s.t = 1.9;
+    sfx.fall();
+    useRun.getState().set({ bar: 0 });
+  };
+
+  const applyRestore = () => {
+    const s = g.current;
+    tiles().forEach((t) => (t.active = true));
+    const run = useRun.getState();
+    if (!s.fellThisRound && !meOut.current) {
+      run.addCoins(1);
+      sfx.coin();
+      const e = engine.current;
+      if (e) burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.4), '#ffd23f', 12);
+    }
+    if (s.round % 5 === 0) run.showToast(`¡Ronda ${s.round}! ¡Va más rápido! ⚡`);
+    s.phase = 'rest';
+    s.t = 0.7;
+    run.set({ banner: null });
+  };
+
+  /** Mostrar el resultado con el lugar que me tocó */
+  const showResult = (place: number, total: number) => {
+    const s = g.current;
+    if (s.phase === 'over') return;
     s.phase = 'over';
     const run = useRun.getState();
-    const survived = won ? s.round : Math.max(0, s.round - 1);
-    // lugar: si perdió, quedan delante los bots que siguen vivos
-    const place = won ? 1 : aliveBots() + 1;
+    const survived = meOut.current ? Math.max(0, s.round - 1) : s.round;
     const bonus = PLACE_BONUS[place - 1] ?? 0;
     if (bonus) run.addCoins(bonus);
     const record = useGame.getState().setBestColors(survived);
     if (engine.current) engine.current.anim.cheer = place <= 3 ? 999 : 2;
-    bots.forEach((b) => !b.out && !won && (b.anim.cheer = 999));
+    bots.forEach((b) => !b.out && (b.anim.cheer = 999));
+    tiles().forEach((t) => (t.active = true));
     sfx.win();
     const medal = ['🥇', '🥈', '🥉'][place - 1];
     run.set({
@@ -120,81 +193,164 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
       result: {
         emoji: medal ?? '🎨',
         title: place === 1 ? '¡Primer lugar!' : place === 2 ? '¡Segundo lugar!' : place === 3 ? '¡Tercer lugar!' : '¡Buen intento!',
-        subtitle:
-          (place === 1 && aliveBots() === 0 ? '¡Fuiste la última en pie! ' : '') +
-          `Lugar ${place} de ${BOT_COUNT + 1} • ${survived} ronda${survived === 1 ? '' : 's'}` +
-          (bonus ? ` • +${bonus} de premio` : ''),
+        subtitle: `Lugar ${place} de ${total} • ${survived} ronda${survived === 1 ? '' : 's'}` + (bonus ? ` • +${bonus} de premio` : ''),
         coins: useRun.getState().coins,
         record,
       },
     });
   };
 
+  /** Solo: terminó la partida contra bots */
+  const finishSolo = (won: boolean) => showResult(won ? 1 : aliveBots() + 1, BOT_COUNT + 1);
+
+  /** Anfitrión: calcula lugares y avisa a todos */
+  const finishHost = () => {
+    const room = useRoom.getState();
+    const all = [...room.players.map((p) => p.id), ...bots.map((b) => b.id)];
+    const alive = all.filter((id) => !outOrder.current.includes(id));
+    const ranking: Ranking = [
+      ...alive.map((id) => ({ id, name: nameOf(id), place: 1 })),
+      ...[...outOrder.current].reverse().map((id) => ({ id, name: nameOf(id), place: 0 })),
+    ];
+    // ajustar lugares de los eliminados: después de los que siguen vivos
+    let next = alive.length ? 2 : 1;
+    ranking.forEach((r) => {
+      if (!alive.includes(r.id)) r.place = next++;
+    });
+    broadcast({ t: 'end', ranking });
+    const mine = ranking.find((r) => r.id === room.myId);
+    showResult(mine?.place ?? ranking.length, ranking.length);
+  };
+
+  // 👫 Mensajes de la sala
+  useEffect(() => {
+    if (mode === 'solo') return;
+    const room = useRoom.getState();
+    useRun.getState().set({ players: room.players.length + room.botPlayers.length });
+    return onNetMessage((m) => {
+      if (mode === 'host') {
+        if (m.t === 'out') {
+          if (!outOrder.current.includes(m.id)) {
+            useRun.getState().showToast(`💦 ¡${nameOf(m.id)} quedó fuera!`);
+            markOut(m.id, false);
+          }
+        }
+        return;
+      }
+      // invitado
+      switch (m.t) {
+        case 'round':
+          applyRound(m.round, m.target, m.colors, m.dur);
+          break;
+        case 'drop':
+          applyDrop();
+          break;
+        case 'restore':
+          applyRestore();
+          break;
+        case 'out':
+          if (m.id !== useRoom.getState().myId) useRun.getState().showToast(`💦 ¡${nameOf(m.id)} quedó fuera!`);
+          break;
+        case 'alive':
+          useRun.getState().set({ players: m.n });
+          break;
+        case 'end': {
+          const mine = m.ranking.find((r) => r.id === useRoom.getState().myId);
+          showResult(mine?.place ?? m.ranking.length, m.ranking.length);
+          break;
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  const loseLife = () => {
+    const run = useRun.getState();
+    const lives = run.lives - 1;
+    run.set({ lives: Math.max(0, lives) });
+    if (lives > 0) {
+      run.showToast(lives === 1 ? '¡Splash! Te queda 1 ❤️' : `¡Splash! Te quedan ${lives} ❤️`);
+      return;
+    }
+    if (mode === 'solo') return finishSolo(false);
+    // en sala: quedo fuera pero sigo mirando
+    meOut.current = true;
+    run.showToast('¡Quedaste fuera! 👀 Mira quién gana');
+    const myId = useRoom.getState().myId;
+    if (mode === 'host') markOut(myId, false);
+    else sendToHost({ t: 'out', id: myId });
+  };
+
   const hooks = useRef<LevelHooks>({});
   hooks.current = {
     onFall: (e) => {
       const s = g.current;
-      const run = useRun.getState();
       sfx.splash();
       burst(e.ctrl.pos.clone().setY(-3), '#7fd8ff', 20);
       // reaparecer sobre un cuadro que siga arriba
       const safe = tiles().filter((t) => t.active);
       const spot = safe.length ? safe[Math.floor(Math.random() * safe.length)] : tiles()[12];
       e.ctrl.reset(new THREE.Vector3(spot.center.x, 0.01, spot.center.z), e.ctrl.facing);
-      if (s.phase === 'over' || thumb) return;
+      if (s.phase === 'over' || thumb || meOut.current) return;
       s.fellThisRound = true;
-      const lives = run.lives - 1;
-      run.set({ lives });
-      if (lives <= 0) finish(false);
-      else run.showToast(lives === 1 ? '¡Splash! Te queda 1 ❤️' : `¡Splash! Te quedan ${lives} ❤️`);
+      loseLife();
     },
     onTick: (e, dt) => {
       const s = g.current;
       if (thumb) return;
-      if (useRun.getState().status === 'playing' || s.phase === 'over') {
+      const playing = useRun.getState().status === 'playing';
+
+      // bots (solo y anfitrión)
+      if (mode !== 'guest' && (playing || s.phase === 'over')) {
         const splashed = updateBots(bots, dt, tileAt, HALF_GRID - 0.9);
         if (splashed.length) {
           splashed.forEach((b) => burst(b.pos.clone().setY(-3.5), '#7fd8ff', 14));
           sfx.splash();
           const run = useRun.getState();
-          run.set({ players: aliveBots() + 1 });
+          if (mode === 'host') splashed.forEach((b) => markOut(b.id, true));
+          else run.set({ players: aliveBots() + 1 });
           run.showToast(splashed.length === 1 ? `💦 ¡${splashed[0].name} se cayó!` : `💦 ¡Se cayeron ${splashed.length}!`);
         }
       }
-      if (s.phase === 'over' || useRun.getState().status !== 'playing') return;
+      if (s.phase === 'over') return;
+      // en sala el juego sigue aunque abras el menú
+      if (!playing && mode === 'solo') return;
       s.t -= dt;
-      if (s.phase === 'wait' || s.phase === 'rest') {
-        if (s.t <= 0) startRound();
-      } else if (s.phase === 'show') {
+
+      if (s.phase === 'show') {
         const bar = Math.max(0, s.t / s.dur);
         if (Math.abs(bar - s.lastBar) > 0.04) {
           s.lastBar = bar;
           useRun.getState().set({ bar });
         }
+      }
+      if (mode === 'guest') return; // el invitado solo obedece al anfitrión
+
+      if (s.phase === 'wait' || s.phase === 'rest') {
+        if (s.t <= 0) startRound();
+      } else if (s.phase === 'show') {
         if (s.t <= 0) {
-          // ¡se caen los cuadros que no son del color!
-          tiles().forEach((t, i) => (t.active = colors.current[i] === s.target));
-          s.phase = 'drop';
-          s.t = 1.9;
-          sfx.fall();
-          useRun.getState().set({ bar: 0 });
+          applyDrop();
+          if (mode === 'host') broadcast({ t: 'drop' });
         }
       } else if (s.phase === 'drop' && s.t <= 0) {
-        tiles().forEach((t) => (t.active = true));
-        const run = useRun.getState();
-        if (!s.fellThisRound) {
-          run.addCoins(1);
-          sfx.coin();
-          burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.4), '#ffd23f', 12);
+        if (mode === 'host') {
+          broadcast({ t: 'restore' });
+          applyRestore();
+          if (s.round >= COLOR_ROUNDS || aliveCount() <= 1) finishHost();
+        } else {
+          if (s.round >= COLOR_ROUNDS || aliveBots() === 0) {
+            tiles().forEach((t) => (t.active = true));
+            return finishSolo(true);
+          }
+          applyRestore();
         }
-        if (s.round >= COLOR_ROUNDS || aliveBots() === 0) return finish(true);
-        if (s.round % 5 === 0) run.showToast(`¡Ronda ${s.round}! ¡Va más rápido! ⚡`);
-        s.phase = 'rest';
-        s.t = 0.7;
-        run.set({ banner: null });
       }
     },
   };
+
+  const botEntries = (): PosEntry[] =>
+    bots.map((b) => [b.id, Math.round(b.pos.x * 100) / 100, Math.round(b.pos.y * 100) / 100, Math.round(b.pos.z * 100) / 100, Math.round(b.facing * 100) / 100, b.anim.speed, b.anim.grounded ? 1 : 0, b.out ? 1 : 0]);
 
   return (
     <>
@@ -211,6 +367,12 @@ export function ColorFloorLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb
       />
       <Tiles engine={engine} colors={colors} target={g} />
       <BotsView bots={bots} />
+      {mode !== 'solo' && (
+        <>
+          <NetSync engine={engine} isOut={() => meOut.current} extra={mode === 'host' ? botEntries : undefined} />
+          <RemotePlayers />
+        </>
+      )}
       <Bursts />
       <Pool />
       <Balloons />

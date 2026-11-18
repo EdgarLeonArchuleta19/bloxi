@@ -35,18 +35,20 @@ function Row({ title, action, onAction, children }: { title: string; action?: st
 }
 
 export function Home({
-  onPlay, onEdit, onAllGames, onSettings,
+  onPlay, onEdit, onAllGames, onSettings, onFriends,
 }: {
   onPlay: (id: GameId, stage?: number) => void;
   onEdit: () => void;
   onAllGames: () => void;
   onSettings: () => void;
+  onFriends: () => void;
 }) {
   const name = useGame((s) => s.name);
   const coins = useGame((s) => s.coins);
   const avatar = useGame((s) => s.avatar);
   const recent = useGame((s) => s.recent);
   const owned = useGame((s) => s.owned);
+  const allowRooms = useGame((s) => s.allowRooms);
   const [open, setOpen] = useState<GameInfo | null>(null);
 
   const recentGames = recent.map((id) => GAMES.find((g) => g.id === id)).filter(Boolean) as GameInfo[];
@@ -61,6 +63,11 @@ export function Home({
           ¡Hola, {name}! <span className="inline-block origin-[70%_70%] animate-[wave_2s_ease-in-out_infinite]">👋</span>
         </h1>
         <div className="flex shrink-0 items-center gap-2">
+          {allowRooms && (
+            <CandyButton tone="sky" className="h-14 px-5 text-xl short:h-11 short:px-4 short:text-base" onClick={onFriends}>
+              👫 Amigos
+            </CandyButton>
+          )}
           <CoinPill amount={coins} />
           <RoundButton onClick={onSettings} label="Ajustes">
             ⚙️

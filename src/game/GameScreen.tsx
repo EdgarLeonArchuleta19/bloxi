@@ -9,12 +9,16 @@ import { OBBY_CHECKPOINTS, ObbyLevel, formatTime } from './levels/Obby';
 import { COLOR_ROUNDS, ColorFloorLevel } from './levels/ColorFloor';
 import { STAR_TIME, StarIslandLevel } from './levels/StarIsland';
 import { useRun } from './runStore';
+import { backToLobby, leaveRoom, startRoomGame, useRoom } from '../net/room';
 import { ControlsEditor } from './ControlsEditor';
 import { TouchControls } from './TouchControls';
 
 export type GameId = 'obby' | 'stars' | 'colors';
 
-export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () => void; stage?: number }) {
+export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId; onExit: () => void; stage?: number; net?: boolean }) {
+  // en sala el menú no detiene el juego (los demás siguen jugando)
+  const [menu, setMenu] = useState(false);
+  const isHost = useRoom((s) => s.isHost);
   const avatar = useGame((s) => s.avatar);
   // limpiar la partida anterior ANTES del primer render (evita avisos viejos)
   useState(() => useRun.getState().reset());
@@ -52,7 +56,7 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
   // pausar si la app pasa a segundo plano
   useEffect(() => {
     const onVis = () => {
-      if (document.hidden && useRun.getState().status === 'playing') useRun.getState().set({ status: 'paused' });
+      if (!net && document.hidden && useRun.getState().status === 'playing') useRun.getState().set({ status: 'paused' });
     };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
@@ -62,10 +66,11 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
     <div className="fixed inset-0 overflow-hidden bg-gradient-to-b from-[#8fd3ff] via-[#c4e7ff] to-[#ffe3f1]">
       <Canvas
         key={runKey}
-        shadows
+        // ⚡ sombras PCF (más ligeras), resolución máx 1.5x y sin antialias en pantallas Retina
+        shadows="percentage"
         flat
-        dpr={[1, 1.75]}
-        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: window.devicePixelRatio < 2, alpha: true, powerPreference: 'high-performance' }}
         camera={{ fov: 55, near: 0.1, far: 400, position: [0, 5, -10] }}
         className="!absolute inset-0"
       >
@@ -75,7 +80,7 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
       </Canvas>
 
       {status !== 'done' && <TouchControls />}
-      <Hud id={id} onPause={() => useRun.getState().set({ status: 'paused' })} />
+      <Hud id={id} onPause={() => (net ? setMenu(true) : useRun.getState().set({ status: 'paused' }))} />
       {id === 'colors' && <ColorBanner />}
       <Toast />
 
@@ -98,31 +103,58 @@ export function GameScreen({ id, onExit, stage = 0 }: { id: GameId; onExit: () =
       </AnimatePresence>
 
       {/* Pausa */}
-      <Modal open={status === 'paused' && !editing} wide>
+      <Modal open={(net ? menu : status === 'paused') && !editing} wide>
         <div className="flex items-center gap-6 short:gap-4">
           <div className="flex w-[30%] shrink-0 flex-col items-center">
             <div className="text-7xl short:text-5xl">⏸️</div>
             <h2 className="mt-2 text-3xl font-bold short:text-2xl">Pausa</h2>
           </div>
           <div className="grid flex-1 grid-cols-2 gap-3 short:gap-2">
-            <CandyButton tone="mint" className="col-span-2 h-16 text-2xl short:h-12 short:text-xl" onClick={() => useRun.getState().set({ status: 'playing' })}>
+            <CandyButton
+              tone="mint"
+              className="col-span-2 h-16 text-2xl short:h-12 short:text-xl"
+              onClick={() => (net ? setMenu(false) : useRun.getState().set({ status: 'playing' }))}
+            >
               ▶ Seguir jugando
             </CandyButton>
-            <CandyButton tone="sky" className="h-14 text-lg short:h-11 short:text-base" onClick={() => setRunKey((k) => k + 1)}>
-              🔄 Otra vez
-            </CandyButton>
-            <CandyButton tone="grape" className="h-14 text-lg short:h-11 short:text-base" onClick={() => setEditing(true)}>
+            {!net && (
+              <CandyButton tone="sky" className="h-14 text-lg short:h-11 short:text-base" onClick={() => setRunKey((k) => k + 1)}>
+                🔄 Otra vez
+              </CandyButton>
+            )}
+            <CandyButton tone="grape" className={`h-14 text-lg short:h-11 short:text-base ${net ? 'col-span-2' : ''}`} onClick={() => setEditing(true)}>
               🕹️ Botones
             </CandyButton>
-            <CandyButton tone="white" className="col-span-2 h-14 text-lg short:h-11 short:text-base" onClick={onExit}>
-              🏠 Salir al inicio
-            </CandyButton>
+            {net ? (
+              <CandyButton
+                tone="white"
+                className="col-span-2 h-14 text-lg short:h-11 short:text-base"
+                onClick={() => {
+                  leaveRoom();
+                  onExit();
+                }}
+              >
+                🚪 Salir de la sala
+              </CandyButton>
+            ) : (
+              <CandyButton tone="white" className="col-span-2 h-14 text-lg short:h-11 short:text-base" onClick={onExit}>
+                🏠 Salir al inicio
+              </CandyButton>
+            )}
           </div>
         </div>
       </Modal>
       <AnimatePresence>{editing && <ControlsEditor onClose={() => setEditing(false)} />}</AnimatePresence>
 
-      <ResultModal onAgain={() => setRunKey((k) => k + 1)} onExit={onExit} />
+      {net ? (
+        <ResultModal
+          onAgain={isHost ? () => startRoomGame() : undefined}
+          onExit={() => backToLobby()}
+          exitLabel="👫 A la sala"
+        />
+      ) : (
+        <ResultModal onAgain={() => setRunKey((k) => k + 1)} onExit={onExit} />
+      )}
     </div>
   );
 }
@@ -244,7 +276,7 @@ function Toast() {
   );
 }
 
-function ResultModal({ onAgain, onExit }: { onAgain: () => void; onExit: () => void }) {
+function ResultModal({ onAgain, onExit, exitLabel = '🏠 Salir' }: { onAgain?: () => void; onExit: () => void; exitLabel?: string }) {
   const result = useRun((s) => s.result);
   const name = useGame((s) => s.name);
   const [show, setShow] = useState(false);
@@ -292,11 +324,13 @@ function ResultModal({ onAgain, onExit }: { onAgain: () => void; onExit: () => v
             </div>
             <div className="mt-5 flex w-full gap-3 short:mt-3">
               <CandyButton tone="white" className="h-16 flex-1 text-xl short:h-12 short:text-lg" onClick={onExit}>
-                🏠 Salir
+                {exitLabel}
               </CandyButton>
-              <CandyButton tone="mint" className="h-16 flex-1 text-xl short:h-12 short:text-lg" onClick={onAgain}>
-                🔄 Otra vez
-              </CandyButton>
+              {onAgain && (
+                <CandyButton tone="mint" className="h-16 flex-1 text-xl short:h-12 short:text-lg" onClick={onAgain}>
+                  🔄 Otra vez
+                </CandyButton>
+              )}
             </div>
           </div>
           </div>
