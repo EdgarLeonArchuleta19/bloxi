@@ -11,13 +11,14 @@ import { CityLevel } from './levels/City';
 import { COLOR_ROUNDS, ColorFloorLevel } from './levels/ColorFloor';
 import { LAVA_ROUNDS, LavaLevel } from './levels/LavaFloor';
 import { RACE_LAPS, RaceLevel } from './levels/Race';
+import { JAIL_STEPS, JailLevel } from './levels/Jail';
 import { STAR_TIME, StarIslandLevel } from './levels/StarIsland';
 import { triggerAction, useRun } from './runStore';
 import { backToLobby, leaveRoom, startRoomGame, useRoom } from '../net/room';
 import { ControlsEditor } from './ControlsEditor';
 import { TouchControls } from './TouchControls';
 
-export type GameId = 'obby' | 'stars' | 'colors' | 'city' | 'lava' | 'race';
+export type GameId = 'obby' | 'stars' | 'colors' | 'city' | 'lava' | 'race' | 'jail';
 
 export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId; onExit: () => void; stage?: number; net?: boolean }) {
   // en sala el menú no detiene el juego (los demás siguen jugando)
@@ -89,11 +90,12 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
         {id === 'city' && <CityLevel avatar={avatar} />}
         {id === 'lava' && <LavaLevel avatar={avatar} />}
         {id === 'race' && <RaceLevel avatar={avatar} />}
+        {id === 'jail' && <JailLevel avatar={avatar} />}
       </Canvas>
 
-      {status !== 'done' && <TouchControls hideJump={id === 'race'} />}
+      {status !== 'done' && <TouchControls pedal={id === 'race'} />}
       <Hud id={id} onPause={() => (net ? setMenu(true) : useRun.getState().set({ status: 'paused' }))} />
-      {(id === 'colors' || id === 'lava' || id === 'city' || id === 'race') && <ColorBanner />}
+      {(id === 'colors' || id === 'lava' || id === 'city' || id === 'race' || id === 'jail') && <ColorBanner />}
       <ActionButtons />
       <Toast />
       <ClosetOverlay />
@@ -174,7 +176,7 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
 }
 
 function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
-  const { status, coins, time, stars, checkpoint, lives, round, players, friends } = useRun();
+  const { status, coins, time, stars, checkpoint, lives, round, players, friends, sky } = useRun();
   const totalCoins = useGame((s) => s.coins);
   const low = id === 'stars' && time <= 10 && status === 'playing';
   return (
@@ -197,9 +199,15 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
             <span className="h-6 w-0.5 rounded bg-ink/15" />
             <span className="tabular-nums">📍 Lugar {checkpoint}/{players}</span>
           </>
+        ) : id === 'jail' ? (
+          <>
+            <span className="tabular-nums">🎯 Paso {Math.max(1, checkpoint)}/{JAIL_STEPS}</span>
+            <span className="h-6 w-0.5 rounded bg-ink/15" />
+            <span className="tabular-nums">⏱ {formatTime(time)}</span>
+          </>
         ) : id === 'city' ? (
           <>
-            <span>🏙️ Mi Ciudad</span>
+            <span>{sky || '🏙️'} Mi Ciudad</span>
             <span className="h-6 w-0.5 rounded bg-ink/15" />
             <span>💖 {friends}</span>
           </>

@@ -65,14 +65,16 @@ Un mundo semi-abierto para pasear libremente:
 - 👗 **Tienda de ropa**: abre el armario sin salir de la ciudad
 - ⛲ **Fuente de los deseos**
 - 🚗 **Carritos y motos** para manejar por las calles (¡con claxon!)
-- 🧒 **Bots** que pasean, platican y se pueden volver **tus amigos 💖**: te siguen por toda la ciudad y se quedan guardados
+- 🧒 **Bots** que pasean, platican y se pueden volver **tus amigos 💖**: te siguen por toda la ciudad y se quedan guardados (y si quieres, dejan de seguirte con 👋 *Ya no ser amigos*)
 - 🐶 **Tienda de mascotas**: adopta un perrito, gatito o conejito que te sigue
 - 🎡 **Feria** con rueda de la fortuna y carrusel (¡te puedes subir!), 🏖️ **lago** con patitos, 🏫 **escuela** con datos curiosos y 🚒 **bomberos** con camión para manejar
 - 🚕 **Tráfico**: carros que circulan solos y se paran si estás enfrente
+- 🌙 **Día y noche**: atardece, salen la luna y las estrellas, y se prenden las ventanas y los faroles (dormir en tu casita te lleva a la mañana)
 - 🪙 Monedas regadas por toda la ciudad
 
 <div align="center">
 <img src="docs/ciudad.png" width="820" alt="Mi Ciudad" />
+<img src="docs/ciudad-noche.png" width="820" alt="Mi Ciudad de noche" />
 </div>
 
 ## 🎮 Minijuegos
@@ -85,7 +87,8 @@ Un mundo semi-abierto para pasear libremente:
 |---|---|
 | ☁️ **Obby en las Nubes** | Parkour de **8 etapas** en el cielo: escalones, plataformas que se mueven, trampolines, puente angosto, plataformas que desaparecen 👻, piedritas sobre lava 🔥, escalera al cielo con elevador y final arcoíris 🌈. Si te caes regresas al checkpoint, y **se guarda tu avance** para seguir otro día. |
 | ⭐ **Atrapa Estrellas** | 60 segundos para juntar estrellas en una isla con árboles, torres y trampolines. ¡Las estrellas arcoíris valen triple! |
-| 🏎️ **Carreritas** | Carreras de karts contra 5 bots: el kart acelera solo y tú solo giras. Turbos ⚡ en la pista y 3 vueltas. |
+| 🏎️ **Carreritas** | Carreras de karts contra 5 bots: pedal verde para acelerar y joystick suave para girar (con ayudita para no salirse). Turbos ⚡ en la pista y 3 vueltas. |
+| 🚔 **Escapa de la Cárcel** | ¡Te encerraron por error! Busca la llave 🔑, toma la tarjeta 💳 escondiéndote de los guardias 👮 detrás de las cajas, cruza el patio sin que te alumbren los reflectores 🔦, trepa el muro y escápate en globo 🎈. |
 | 🌋 **El Piso es Lava** | Cuando suena la alarma, ¡súbete a un mueble antes de que el piso se vuelva lava! 10 rondas contra 7 bots y cada ronda se hunde un mueble. |
 | 🎨 **Piso de Colores** | ¡Contra 7 jugadores bot 🤖 con nombres y outfits al azar! Sale un color y hay que pararse en él antes de que los demás cuadros se caigan al agua. Gana quien quede al final (🥇🥈🥉). Tú tienes 3 vidas ❤️❤️❤️. Los bots son de mentiritas: todo pasa en el dispositivo. |
 
@@ -95,6 +98,7 @@ Un mundo semi-abierto para pasear libremente:
 <img src="docs/juego-colores.png" width="270" alt="Piso de Colores" />
 <img src="docs/juego-lava.png" width="270" alt="El Piso es Lava" />
 <img src="docs/juego-carreras.png" width="270" alt="Carreritas" />
+<img src="docs/juego-carcel.png" width="270" alt="Escapa de la Cárcel" />
 </div>
 
 El catálogo tiene **buscador y categorías**, así que está listo para muchos juegos más.

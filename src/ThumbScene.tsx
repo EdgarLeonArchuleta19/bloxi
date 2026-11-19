@@ -5,6 +5,7 @@ import { CityLevel } from './game/levels/City';
 import { ColorFloorLevel } from './game/levels/ColorFloor';
 import { LavaLevel } from './game/levels/LavaFloor';
 import { RaceLevel } from './game/levels/Race';
+import { JailLevel } from './game/levels/Jail';
 import { ObbyLevel } from './game/levels/Obby';
 import { StarIslandLevel } from './game/levels/StarIsland';
 import type { ThumbShot } from './game/PlayWorld';
@@ -24,6 +25,10 @@ const SHOTS: Record<string, { shot: ThumbShot; avatar: Partial<AvatarConfig> }> 
   race: {
     shot: { player: [0, 0, 0], cam: [0, 0, 0], look: [0, 0, 0] },
     avatar: { hat: 'cap', glasses: 'sun' },
+  },
+  jail: {
+    shot: { player: [-3, 0, 24.4], cam: [3.5, 6.5, 32.5], look: [-4, 0.8, 21.5] },
+    avatar: { top: 'tee-jail', bottom: 'jeans', hat: 'bow' },
   },
   lava: {
     shot: { player: [0, 1.0, -11.4], cam: [7, 7.5, 6], look: [0.5, 0.6, -5] },
@@ -56,6 +61,7 @@ export function ThumbScene({ id }: { id: string }) {
         {id === 'city' && <CityLevel avatar={avatar} thumb={cfg.shot} />}
         {id === 'lava' && <LavaLevel avatar={avatar} thumb={cfg.shot} />}
         {id === 'race' && <RaceLevel avatar={avatar} thumb={cfg.shot} />}
+        {id === 'jail' && <JailLevel avatar={avatar} thumb={cfg.shot} />}
       </Canvas>
     </div>
   );

@@ -28,6 +28,7 @@ interface RunState {
   round: number;
   players: number;
   friends: number;
+  sky: string; // ☀️ 🌅 🌙 (Mi Ciudad)
   /** letrero grande: "¡Párate en AZUL!" (name+color) o texto libre */
   banner: { name: string; color: string; text?: string } | null;
   bar: number; // 0..1 tiempo restante de la ronda
@@ -51,6 +52,7 @@ export const useRun = create<RunState>()((set) => ({
   round: 0,
   players: 8,
   friends: 0,
+  sky: '',
   banner: null,
   bar: 0,
   toast: null,
@@ -66,7 +68,7 @@ export const useRun = create<RunState>()((set) => ({
   showToast: (text) => set({ toast: { id: Math.random(), text } }),
   reset: () =>
     set({
-      status: 'countdown', coins: 0, time: 0, stars: 0, checkpoint: 0, lives: 3, round: 0, players: 8, friends: 0,
+      status: 'countdown', coins: 0, time: 0, stars: 0, checkpoint: 0, lives: 3, round: 0, players: 8, friends: 0, sky: '',
       banner: null, bar: 0, toast: null, result: null, actions: [], overlay: null,
     }),
 }));

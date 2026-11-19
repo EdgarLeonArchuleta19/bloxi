@@ -162,7 +162,7 @@ export function Windows({ buildings }: { buildings: { x: number; z: number; w: n
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, spots.length]}>
       <planeGeometry args={[1.2, 1.3]} />
-      <meshStandardMaterial color="#9fdcff" roughness={0.2} metalness={0.1} emissive="#bfe9ff" emissiveIntensity={0.15} />
+      <meshStandardMaterial color="#9fdcff" roughness={0.2} metalness={0.1} emissive="#bfe9ff" emissiveIntensity={0.15} userData={{ nightGlow: 0.85, dayGlow: 0.15 }} />
     </instancedMesh>
   );
 }

@@ -4,6 +4,7 @@ export const input = {
   moveY: 0, // 1 adelante, -1 atrás
   jump: false, // se "consume" al usarse
   jumpHeld: false,
+  gas: false, // pedal de las carreritas
   camDX: 0, // arrastre acumulado de cámara (pixeles)
   camDY: 0,
 };
@@ -42,5 +43,5 @@ export function bindKeyboard() {
 
 export function resetInput() {
   input.moveX = input.moveY = input.camDX = input.camDY = 0;
-  input.jump = input.jumpHeld = false;
+  input.jump = input.jumpHeld = input.gas = false;
 }

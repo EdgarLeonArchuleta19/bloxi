@@ -39,6 +39,7 @@ interface SaveState {
   setControls: (c: ControlsLayout | null) => void;
   setAllowRooms: (v: boolean) => void;
   addCityFriend: (f: { name: string; avatar: AvatarConfig }) => void;
+  removeCityFriend: (name: string) => void;
   setCityPet: (p: string | null) => void;
   resetAll: () => void;
 }
@@ -142,6 +143,7 @@ export const useGame = create<SaveState>()(
       setControls: (controls) => set({ controls }),
       setAllowRooms: (allowRooms) => set({ allowRooms }),
       setCityPet: (cityPet) => set({ cityPet }),
+      removeCityFriend: (name) => set((s) => ({ cityFriends: s.cityFriends.filter((x) => x.name !== name) })),
       addCityFriend: (f) => set((s) => ({ cityFriends: [...s.cityFriends.filter((x) => x.name !== f.name), f].slice(-6) })),
       resetAll: () => set({ ...initial }),
     }),

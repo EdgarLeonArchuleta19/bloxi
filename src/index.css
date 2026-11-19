@@ -227,6 +227,22 @@ canvas {
     0 calc(var(--s) * 0.015) 0 #b8296a,
     0 calc(var(--s) * 0.03) calc(var(--s) * 0.08) rgba(51, 38, 77, 0.3);
 }
+.jump-btn.pedal-btn {
+  background: radial-gradient(circle at 50% 28%, #b8ffe0 0%, #4fe3a8 42%, #18b87c 100%);
+  box-shadow:
+    0 0 0 calc(var(--s) * 0.035) rgba(255, 255, 255, 0.35),
+    0 calc(var(--s) * 0.075) 0 #0f8a5c,
+    0 calc(var(--s) * 0.11) calc(var(--s) * 0.18) rgba(51, 38, 77, 0.35);
+}
+.jump-btn.pedal-btn.pressed {
+  box-shadow:
+    0 0 0 calc(var(--s) * 0.035) rgba(255, 255, 255, 0.5),
+    0 calc(var(--s) * 0.015) 0 #0f8a5c,
+    0 calc(var(--s) * 0.03) calc(var(--s) * 0.08) rgba(51, 38, 77, 0.3);
+}
+.jump-btn .jump-label.pedal-label {
+  -webkit-text-stroke-color: #0f6b4a;
+}
 .jump-btn .jump-label {
   font-weight: 800;
   color: #fff;

@@ -145,6 +145,7 @@ export const sfx = {
   bump: () => tone(140, 0.18, { type: 'sine', vol: 0.25, slide: 80 }),
   engine: () => tone(110, 0.25, { type: 'sawtooth', vol: 0.04, slide: 220 }),
   hello: () => [660, 880].forEach((f, i) => tone(f, 0.12, { type: 'triangle', vol: 0.12, delay: i * 0.09 })),
+  alarm: () => [880, 660, 880, 660].forEach((f, i) => tone(f, 0.17, { type: 'square', vol: 0.06, delay: i * 0.18 })),
   equip: () => tone(784, 0.1, { type: 'triangle', vol: 0.12, slide: 1175 }),
 };
 

@@ -32,6 +32,33 @@ export const JumpButtonView = forwardRef<HTMLDivElement, { size: number } & Reac
   },
 );
 
+/** Pedal para acelerar (carreritas) */
+export const PedalButtonView = forwardRef<HTMLDivElement, { size: number } & React.HTMLAttributes<HTMLDivElement>>(
+  function PedalButtonView({ size, style, className = '', ...rest }, ref) {
+    return (
+      <div
+        ref={ref}
+        {...rest}
+        className={`absolute ${className}`}
+        style={{ width: size, height: size, touchAction: 'none', ['--s' as string]: `${size}px`, ...style }}
+      >
+        <div className="jump-btn pedal-btn">
+          <svg width={size * 0.4} height={size * 0.4} viewBox="0 0 40 40" style={{ marginTop: -size * 0.03 }}>
+            <rect x="9" y="3" width="22" height="30" rx="6" fill="#ffffff" stroke="#0f6b4a" strokeWidth="3" />
+            {[10, 16, 22].map((y) => (
+              <rect key={y} x="13" y={y} width="14" height="3" rx="1.5" fill="#2fd39a" />
+            ))}
+            <rect x="17" y="33" width="6" height="5" rx="2" fill="#0f6b4a" />
+          </svg>
+          <span className="jump-label pedal-label" style={{ fontSize: Math.max(10, size * 0.13), marginTop: size * 0.02 }}>
+            ACELERAR
+          </span>
+        </div>
+      </div>
+    );
+  },
+);
+
 /** Dibujo del joystick */
 export const StickView = forwardRef<HTMLDivElement, { size: number; knobRef?: React.Ref<HTMLDivElement> } & React.HTMLAttributes<HTMLDivElement>>(
   function StickView({ size, knobRef, style, className = '', ...rest }, ref) {
@@ -53,7 +80,7 @@ export const StickView = forwardRef<HTMLDivElement, { size: number; knobRef?: Re
 );
 
 /** Joystick, arrastrar para girar la cámara y botón de saltar, en la posición y tamaño que elija la niña */
-export function TouchControls({ hideJump = false }: { hideJump?: boolean }) {
+export function TouchControls({ pedal = false }: { pedal?: boolean }) {
   const { w, h } = useViewportSize();
   const saved = useGame((s) => s.controls);
   const layout = saved ?? defaultLayout(w, h);
@@ -136,21 +163,45 @@ export function TouchControls({ hideJump = false }: { hideJump?: boolean }) {
     input.jumpHeld = false;
     jumpBtn.current?.firstElementChild?.classList.remove('pressed');
   };
+  const gasOn = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    input.gas = true;
+    haptic(10);
+    jumpBtn.current?.firstElementChild?.classList.add('pressed');
+  };
+  const gasOff = () => {
+    input.gas = false;
+    jumpBtn.current?.firstElementChild?.classList.remove('pressed');
+  };
+  useEffect(() => () => void (input.gas = false), []);
 
   return (
     <>
       <div className="absolute inset-0 z-10" style={{ touchAction: 'none' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
       <StickView ref={base} knobRef={knob} size={layout.stickSize} className="pointer-events-none z-20" style={{ left: pos.stick.x, top: pos.stick.y, opacity: 0.55 }} />
-      {!hideJump && <JumpButtonView
-        ref={jumpBtn}
-        size={pos.jump.size}
-        className="z-20"
-        style={{ left: pos.jump.x - pos.jump.size / 2, top: pos.jump.y - pos.jump.size / 2 }}
-        onPointerDown={jump}
-        onPointerUp={release}
-        onPointerCancel={release}
-        onPointerLeave={release}
-      />}
+      {pedal ? (
+        <PedalButtonView
+          ref={jumpBtn}
+          size={pos.jump.size * 1.1}
+          className="z-20"
+          style={{ left: pos.jump.x - (pos.jump.size * 1.1) / 2, top: pos.jump.y - (pos.jump.size * 1.1) / 2 }}
+          onPointerDown={gasOn}
+          onPointerUp={gasOff}
+          onPointerCancel={gasOff}
+        />
+      ) : (
+        <JumpButtonView
+          ref={jumpBtn}
+          size={pos.jump.size}
+          className="z-20"
+          style={{ left: pos.jump.x - pos.jump.size / 2, top: pos.jump.y - pos.jump.size / 2 }}
+          onPointerDown={jump}
+          onPointerUp={release}
+          onPointerCancel={release}
+          onPointerLeave={release}
+        />
+      )}
     </>
   );
 }

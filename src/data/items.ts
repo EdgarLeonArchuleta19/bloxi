@@ -91,6 +91,7 @@ export const ITEMS: Item[] = [
   top('tank-mint', 'Tirantes menta', '🎽', 5, { shape: 'tank', color: '#2fd39a' }),
   top('tee-bolt', 'Rayo', '⚡', 5, { shape: 'tee', color: '#33264d', decal: 'bolt' }),
   top('tee-sailor', 'Marinera', '⚓', 8, { shape: 'tee', color: '#ffffff', pattern: 'stripes', accent: '#2d4a8a' }),
+  top('tee-jail', 'Rayas de fuga', '🦹', 8, { shape: 'tee', color: '#ffffff', pattern: 'stripes', accent: '#33264d' }),
   top('tee-dots', 'Confeti', '🎉', 8, { shape: 'tee', color: '#ffcf33', pattern: 'dots' }),
   top('tee-rainbow', 'Arcoíris', '🌈', 8, { shape: 'tee', color: '#ffffff', decal: 'rainbow' }),
   top('tee-dino', 'Dino', '🦕', 8, { shape: 'tee', color: '#ffe8a3', decal: 'dinoprint' }),

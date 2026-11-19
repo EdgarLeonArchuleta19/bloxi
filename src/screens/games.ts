@@ -71,7 +71,7 @@ export const GAMES: GameInfo[] = [
   {
     id: 'race',
     title: 'Carreritas',
-    desc: '¡Carreras de karts contra 5 corredores! El kart acelera solito: tú solo giras con el joystick. Pasa por los turbos ⚡ y gana en 3 vueltas.',
+    desc: '¡Carreras de karts contra 5 corredores! Aprieta el pedal verde para acelerar y gira con el joystick. Pasa por los turbos ⚡ y gana en 3 vueltas.',
     emoji: '🏎️',
     thumb: 'thumbs/race.jpg',
     gradient: 'linear-gradient(135deg,#3cb7f5 0%,#2fd39a 100%)',
@@ -80,6 +80,19 @@ export const GAMES: GameInfo[] = [
     tags: ['carreras', 'karts', 'carros', 'velocidad', 'bots', 'turbo'],
     difficulty: 'Fácil',
     duration: '2 min',
+  },
+  {
+    id: 'jail',
+    title: 'Escapa de la Cárcel',
+    desc: '¡Te encerraron por error! Busca la llave, toma la tarjeta sin que te vean los guardias 👮, esquiva los reflectores 🔦 y escápate en globo 🎈.',
+    emoji: '🚔',
+    thumb: 'thumbs/jail.jpg',
+    gradient: 'linear-gradient(135deg,#8b6cf0 0%,#3cb7f5 100%)',
+    shade: '#5a43c9',
+    category: 'Aventura',
+    tags: ['carcel', 'escapar', 'guardias', 'policias', 'fuga', 'aventura', 'jail'],
+    difficulty: 'Medio',
+    duration: '4 min',
   },
   {
     id: 'lava',

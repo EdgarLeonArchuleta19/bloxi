@@ -14,13 +14,13 @@ import { useRun } from '../runStore';
 import { CarModel, signMat } from './cityModels';
 import { NAMES, nameTag, randomAvatar } from './colorBots';
 
-// 🏎️ Carreritas: 3 vueltas contra 5 bots. El kart acelera solo; tú solo giras (abajo = frenar).
+// 🏎️ Carreritas: 3 vueltas contra 5 bots. Pedal verde = acelerar, joystick = girar (abajo = frenar).
 
 export const RACE_LAPS = 3;
 const BOTS = 5;
 const N = 800; // puntos de la pista
-const HALF_W = 7; // medio ancho de la pista
-const MAX_V = 22;
+const HALF_W = 8.5; // medio ancho de la pista (anchita para que sea fácil)
+const MAX_V = 23;
 const BOOST_V = 32;
 const KART = 0.85;
 const BOOST_PADS = [110, 290, 470, 640];
@@ -81,6 +81,7 @@ interface Racer {
   lane: number;
   skill: number;
   rubber: number; // los bots aceleran si van atrás de ti
+  steer: number; // volante suavizado
   isPlayer: boolean;
 }
 
@@ -95,7 +96,7 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     const names = NAMES.filter((n) => !playerName || !n.toLowerCase().startsWith(playerName.toLowerCase().slice(0, 3))).sort(() => Math.random() - 0.5);
     const list: Racer[] = [];
     for (let k = 0; k < BOTS + 1; k++) {
-      const isPlayer = k === 4; // sales en 5° lugar: ¡a rebasar!
+      const isPlayer = k === 3; // sales en 4° lugar: ¡a rebasar!
       const row = Math.floor(k / 2);
       const idx = wrap(-14 - row * 11);
       const lane = k % 2 ? 3 : -3;
@@ -114,8 +115,9 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         finished: 0,
         boostT: 0,
         lane,
-        skill: 0.93 + Math.random() * 0.07,
+        skill: 0.8 + Math.random() * 0.08,
         rubber: 1,
+        steer: 0,
         isPlayer,
       });
     }
@@ -145,10 +147,18 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const drive = (r: Racer, dt: number, throttle: number, steer: number) => {
     const top = r.boostT > 0 ? BOOST_V : MAX_V * (r.isPlayer ? 1 : r.skill * r.rubber);
     if (r.boostT > 0) r.boostT -= dt;
-    if (throttle > 0) r.v = Math.min(top, r.v + 14 * throttle * dt);
+    if (throttle > 0) r.v = Math.min(top, r.v + (r.isPlayer ? 17 : 14) * throttle * dt);
     else if (throttle < 0) r.v = Math.max(-6, r.v + 22 * throttle * dt);
+    else r.v *= Math.exp(-0.7 * dt); // sin pedal: se va frenando solito
     if (r.v > top) r.v += (top - r.v) * (1 - Math.exp(-2 * dt));
-    r.heading -= steer * 2.2 * Math.min(1, Math.abs(r.v) / 6) * (r.v < 0 ? -1 : 1) * dt;
+    r.heading -= steer * (r.isPlayer ? 1.75 : 2.2) * Math.min(1, Math.abs(r.v) / 6) * (r.v < 0 ? -1 : 1) * dt;
+    if (r.isPlayer && Math.abs(steer) < 0.15 && r.v > 3) {
+      // 🤝 ayudita: si no giras, el kart se acomoda solito con la pista
+      const T0 = track.T[r.idx];
+      let dh = Math.atan2(T0.x, T0.z) - r.heading;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      if (Math.abs(dh) < 0.9) r.heading += dh * (1 - Math.exp(-1.6 * dt));
+    }
     r.pos.x += Math.sin(r.heading) * r.v * dt;
     r.pos.z += Math.cos(r.heading) * r.v * dt;
     // pista: no salirse de las orillas
@@ -159,7 +169,14 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     const lim = HALF_W - 0.9;
     if (Math.abs(lat) > lim) {
       r.pos.addScaledVector(Rt, Math.sign(lat) * lim - lat);
-      r.v *= Math.exp(-2.5 * dt);
+      r.v *= Math.exp(-(r.isPlayer ? 0.8 : 2.5) * dt);
+      if (r.isPlayer) {
+        // resbalar por la orilla en vez de atorarse
+        const T0 = track.T[r.idx];
+        let dh = Math.atan2(T0.x, T0.z) - r.heading;
+        dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+        if (Math.abs(dh) < 1.4) r.heading += dh * (1 - Math.exp(-4 * dt));
+      }
     }
     // vueltas: cruzar la línea de meta
     if (prev > N * 0.8 && r.idx < N * 0.2) r.lap++;
@@ -190,7 +207,7 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     const curve = track.T[r.idx].dot(track.T[wrap(r.idx + 45)]);
     // atrás de ti: un poquito más rápidos · muy adelante: un poquito más lentos
     const gap = progress(me) - progress(r);
-    r.rubber = gap > 60 ? 1.1 : gap > 0 ? 1.04 : gap < -120 ? 0.92 : 0.98;
+    r.rubber = gap > 80 ? 1.05 : gap > 0 ? 1 : gap < -60 ? 0.82 : 0.92;
     const throttle = curve < 0.75 && r.v > MAX_V * 0.8 ? -0.1 : 1;
     // cambiar de carril para rebasar
     if (Math.random() < dt * 0.25) r.lane = THREE.MathUtils.clamp(r.lane + (Math.random() - 0.5) * 6, -4, 4);
@@ -224,7 +241,11 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   };
 
   useLayoutEffect(() => {
-    useRun.getState().set({ round: 1, checkpoint: 5, players: BOTS + 1 });
+    useRun.getState().set({ round: 1, checkpoint: 4, players: BOTS + 1 });
+    if (thumb) return;
+    const t = setTimeout(() => useRun.getState().showToast('🟢 ¡Deja apretado el pedal verde para acelerar!'), 3600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hooks = useRef<LevelHooks>({});
@@ -233,10 +254,15 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       const run = useRun.getState();
       const go = run.status === 'playing' || run.status === 'done';
       if (!thumb && go) {
-        // jugador: acelera solito; joystick abajo = frenar
+        // jugador: pedal = acelerar · joystick a los lados = girar · abajo = frenar
         if (!me.finished) {
-          const brake = input.moveY < -0.45;
-          drive(me, dt, brake ? -1 : run.status === 'playing' ? 1 : 0, input.moveX);
+          const brake = input.moveY < -0.5;
+          const gas = input.gas || input.jumpHeld || input.moveY > 0.5;
+          // volante "grueso": zona muerta + curva suave, para que no gire de golpe
+          const x = input.moveX, ax = Math.abs(x);
+          const want = ax < 0.12 ? 0 : Math.sign(x) * Math.pow((ax - 0.12) / 0.88, 1.6);
+          me.steer += (want - me.steer) * (1 - Math.exp(-7 * dt));
+          drive(me, dt, brake ? -1 : gas && run.status === 'playing' ? 1 : 0, me.steer);
         } else drive(me, dt, 0.3, 0);
         for (const r of racers) if (!r.isPlayer) driveBot(r, dt);
         // choques suaves entre karts
@@ -492,7 +518,7 @@ function TrackMesh({ track }: { track: Track }) {
       </instancedMesh>
       {/* línea de meta a cuadritos */}
       <group position={[s0.x, 0.1, s0.z]} rotation={[0, arch, 0]}>
-        {Array.from({ length: 14 }, (_, i) =>
+        {Array.from({ length: Math.round(HALF_W * 2) }, (_, i) =>
           [0, 1].map((row) => (
             <mesh key={`${i}${row}`} position={[-HALF_W + 0.5 + i, 0, row - 0.5]} rotation={[-Math.PI / 2, 0, 0]} material={mat((i + row) % 2 ? '#33264d' : '#ffffff')}>
               <planeGeometry args={[1, 1]} />

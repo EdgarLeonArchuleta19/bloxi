@@ -16,6 +16,7 @@ import {
   SchoolDecor, ShopsDecor, Signs, TreeTops, WHEEL_R, WHEEL_Y, Windows, carouselAngle, wheelAngle, type PetKind,
 } from './cityModels';
 import { NAMES, nameTag, randomAvatar } from './colorBots';
+import { DayNight, StreetLamps, dayNight, skipToMorning } from './cityDayNight';
 import { Coins, type CoinData } from './pickups';
 
 // 🏙️ Mini Ciudad: mundo abierto con casita, tiendas, carros, motos y bots que pueden ser tus amigos.
@@ -45,6 +46,8 @@ const FACTS = [
   '📚 ¡Los delfines duermen con un ojo abierto! 🐬',
 ];
 const MAX_FRIENDS = 6;
+const BYE_PHRASES = ['¡Está bien! ¡Adiós! 👋', '¡Nos vemos luego! 😊', '¡Bye bye! Me voy a pasear 🚶'];
+const NIGHT_PHRASES = ['¡Mira cuántas estrellas! ✨', '¡Ya salió la luna! 🌙', 'Ya casi es hora de dormir 😴', '¡Las luces se ven bonitas! 💡'];
 
 interface Npc {
   name: string;
@@ -72,7 +75,7 @@ interface Vehicle {
 
 /* ---------- burbujas de diálogo ---------- */
 const bubbleCache = new Map<string, THREE.SpriteMaterial>();
-function bubbleMat(text: string) {
+export function bubbleMat(text: string) {
   let m = bubbleCache.get(text);
   if (m) return m;
   const cv = document.createElement('canvas');
@@ -233,7 +236,7 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     () => TRAFFIC_LOOPS.map((l) => ({ ...l, seg: 0, t: Math.random(), pos: new THREE.Vector3(), heading: 0, v: l.speed })),
     [],
   );
-  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__city = { engine, vehicles, npcs, driving };
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__city = { engine, vehicles, npcs, driving, dayNight };
 
   const say = (n: Npc, text: string, secs = 3.5) => {
     n.bubble = text;
@@ -373,6 +376,21 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         run.showToast(`💖 ¡${n.name} ahora es tu amigo!`);
         return;
       }
+      if (id.startsWith('unfriend:')) {
+        const n = npcs[Number(id.slice(9))];
+        n.friend = false;
+        n.hidden = false;
+        n.goal = null;
+        n.wait = 2;
+        n.anim.wave = 1.6;
+        n.facing = Math.atan2(e.ctrl.pos.x - n.pos.x, e.ctrl.pos.z - n.pos.z);
+        sfx.hello();
+        say(n, BYE_PHRASES[Math.floor(Math.random() * BYE_PHRASES.length)]);
+        useGame.getState().removeCityFriend(n.name);
+        run.set({ friends: friendCount() });
+        run.showToast(`👋 ${n.name} ya no te sigue. ¡Pueden volver a ser amigos cuando quieras!`);
+        return;
+      }
       if (id.startsWith('shop:')) {
         const shop = id.slice(5) as ShopId;
         const price = PRICES[shop] ?? 0;
@@ -398,11 +416,13 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
             e.anim.cheer = 1.5;
             break;
           }
-          case 'house':
-            run.set({ banner: { name: '', color: '#33264d', text: '😴 Zzz… tomando una siesta' } });
+          case 'house': {
+            const sleepNight = dayNight.night > 0.4;
+            run.set({ banner: { name: '', color: '#33264d', text: sleepNight ? '😴 Zzz… durmiendo hasta mañana' : '😴 Zzz… tomando una siesta' } });
             setTimeout(() => {
               useRun.getState().set({ banner: null });
-              useRun.getState().showToast('☀️ ¡Qué buena siesta! Tus amigos te esperaban');
+              if (sleepNight) skipToMorning();
+              useRun.getState().showToast(sleepNight ? '☀️ ¡Buenos días! Dormiste toda la noche' : '☀️ ¡Qué buena siesta! Tus amigos te esperaban');
               const pe = engine.current;
               if (pe) pe.anim.cheer = 1.5;
               npcs.forEach((n, k) => {
@@ -412,6 +432,7 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
               });
             }, 2200);
             break;
+          }
           case 'pets': {
             const kinds = PET_KINDS.map((p) => p.kind);
             const next = kinds[(kinds.indexOf(useGame.getState().cityPet as PetKind) + 1) % kinds.length];
@@ -498,6 +519,7 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       const n = npcs[nearest];
       opts.push({ id: `hi:${nearest}`, label: `👋 Saludar a ${n.name}`, tone: 'mint', d: nd });
       if (!n.friend && friendCount() < MAX_FRIENDS) opts.push({ id: `friend:${nearest}`, label: '💖 Ser amigos', tone: 'candy', d: nd + 0.01 });
+      if (n.friend) opts.push({ id: `unfriend:${nearest}`, label: '👋 Ya no ser amigos', tone: 'white', d: nd + 0.01 });
     }
     opts.sort((a, b) => a.d - b.d);
     setActions(opts.slice(0, 2).map(({ id, label, tone }) => ({ id, label, tone })));
@@ -563,7 +585,8 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         } else if (!n.friend) {
           n.goal = null;
           n.wait = 1 + Math.random() * 3.5;
-          if (Math.random() < 0.25) say(n, PHRASES[Math.floor(Math.random() * PHRASES.length)], 3);
+          const ph = dayNight.night > 0.6 && Math.random() < 0.6 ? NIGHT_PHRASES : PHRASES;
+          if (Math.random() < 0.25) say(n, ph[Math.floor(Math.random() * ph.length)], 3);
         }
       }
       n.pos.y = groundAt(n.pos.x, n.pos.z);
@@ -763,6 +786,8 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         camCollide
         camBlockers={canopies}
       />
+      <DayNight frozen={!!thumb} />
+      <StreetLamps />
       <Roads />
       <TreeTops />
       <Apartments buildings={apartments} />
@@ -885,6 +910,7 @@ function NpcsView({ npcs }: { npcs: Npc[] }) {
   const bubbles = useRef<(THREE.Sprite | null)[]>([]);
   const tags = useMemo(() => npcs.map((n) => nameTag(n.friend ? `💖 ${n.name}` : n.name)), [npcs]);
   const friendTags = useMemo(() => npcs.map((n) => nameTag(`💖 ${n.name}`)), [npcs]);
+  const plainTags = useMemo(() => npcs.map((n) => nameTag(n.name)), [npcs]);
   const tagRefs = useRef<(THREE.Sprite | null)[]>([]);
   useFrame((state) => {
     const cam = state.camera.position;
@@ -901,7 +927,8 @@ function NpcsView({ npcs }: { npcs: Npc[] }) {
         if (n.bubble) b.material = bubbleMat(n.bubble);
       }
       const t = tagRefs.current[i];
-      if (t && n.friend && t.material !== friendTags[i]) t.material = friendTags[i];
+      const want = n.friend ? friendTags[i] : plainTags[i];
+      if (t && t.material !== want) t.material = want;
     });
   });
   return (
