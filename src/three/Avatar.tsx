@@ -50,6 +50,8 @@ export function Avatar({ config, anim }: { config: AvatarConfig; anim?: AvatarAn
   }, [config.face]);
 
   useFrame((state, rawDt) => {
+    // ⚡ si el personaje (o su grupo) está oculto, no animar
+    if (root.current && (!root.current.visible || (root.current.parent && !root.current.parent.visible))) return;
     const dt = Math.min(rawDt, 0.05);
     const a = anim ?? fallback;
     const t = state.clock.elapsedTime;

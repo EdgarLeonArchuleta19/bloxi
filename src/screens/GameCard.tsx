@@ -11,7 +11,7 @@ export function useBest(game: GameInfo) {
   const bestColors = useGame((s) => s.bestColors);
   if (game.id === 'obby') return bestObby !== null ? formatTime(bestObby) : null;
   if (game.id === 'colors') return bestColors > 0 ? `${bestColors} rondas` : null;
-  if (game.id === 'city' || game.id === 'lava') return null;
+  if (game.id === 'city' || game.id === 'lava' || game.id === 'race') return null;
   return bestStars > 0 ? `${bestStars} ⭐` : null;
 }
 

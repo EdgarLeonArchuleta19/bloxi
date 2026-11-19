@@ -66,6 +66,9 @@ Un mundo semi-abierto para pasear libremente:
 - ⛲ **Fuente de los deseos**
 - 🚗 **Carritos y motos** para manejar por las calles (¡con claxon!)
 - 🧒 **Bots** que pasean, platican y se pueden volver **tus amigos 💖**: te siguen por toda la ciudad y se quedan guardados
+- 🐶 **Tienda de mascotas**: adopta un perrito, gatito o conejito que te sigue
+- 🎡 **Feria** con rueda de la fortuna y carrusel (¡te puedes subir!), 🏖️ **lago** con patitos, 🏫 **escuela** con datos curiosos y 🚒 **bomberos** con camión para manejar
+- 🚕 **Tráfico**: carros que circulan solos y se paran si estás enfrente
 - 🪙 Monedas regadas por toda la ciudad
 
 <div align="center">
@@ -82,6 +85,7 @@ Un mundo semi-abierto para pasear libremente:
 |---|---|
 | ☁️ **Obby en las Nubes** | Parkour de **8 etapas** en el cielo: escalones, plataformas que se mueven, trampolines, puente angosto, plataformas que desaparecen 👻, piedritas sobre lava 🔥, escalera al cielo con elevador y final arcoíris 🌈. Si te caes regresas al checkpoint, y **se guarda tu avance** para seguir otro día. |
 | ⭐ **Atrapa Estrellas** | 60 segundos para juntar estrellas en una isla con árboles, torres y trampolines. ¡Las estrellas arcoíris valen triple! |
+| 🏎️ **Carreritas** | Carreras de karts contra 5 bots: el kart acelera solo y tú solo giras. Turbos ⚡ en la pista y 3 vueltas. |
 | 🌋 **El Piso es Lava** | Cuando suena la alarma, ¡súbete a un mueble antes de que el piso se vuelva lava! 10 rondas contra 7 bots y cada ronda se hunde un mueble. |
 | 🎨 **Piso de Colores** | ¡Contra 7 jugadores bot 🤖 con nombres y outfits al azar! Sale un color y hay que pararse en él antes de que los demás cuadros se caigan al agua. Gana quien quede al final (🥇🥈🥉). Tú tienes 3 vidas ❤️❤️❤️. Los bots son de mentiritas: todo pasa en el dispositivo. |
 
@@ -90,6 +94,7 @@ Un mundo semi-abierto para pasear libremente:
 <img src="docs/juego-estrellas.png" width="270" alt="Atrapa Estrellas" />
 <img src="docs/juego-colores.png" width="270" alt="Piso de Colores" />
 <img src="docs/juego-lava.png" width="270" alt="El Piso es Lava" />
+<img src="docs/juego-carreras.png" width="270" alt="Carreritas" />
 </div>
 
 El catálogo tiene **buscador y categorías**, así que está listo para muchos juegos más.

@@ -205,16 +205,20 @@ export function PlayWorld({ platforms, spawn, yaw, killY, avatar, hooks, onEngin
       const len = camDir.length();
       camDir.divideScalar(len || 1);
       let best = len;
+      // ⚡ solo revisar cajas que tocan el tramo entre la niña y la cámara
+      const x0 = Math.min(look.current.x, tmpCam.x), x1 = Math.max(look.current.x, tmpCam.x);
+      const z0 = Math.min(look.current.z, tmpCam.z), z1 = Math.max(look.current.z, tmpCam.z);
+      const test = (min: THREE.Vector3, max: THREE.Vector3) => {
+        if (max.x < x0 || min.x > x1 || max.z < z0 || min.z > z1) return;
+        const t = rayBox(look.current, camDir, min, max);
+        if (t < best) best = t;
+      };
       for (let i = 1; i < solids.length; i++) {
         const s = solids[i];
         if (!s.active || s.max.y < 0.6) continue;
-        const t = rayBox(look.current, camDir, s.min, s.max);
-        if (t < best) best = t;
+        test(s.min, s.max);
       }
-      if (camBlockers) for (const b of camBlockers) {
-        const t = rayBox(look.current, camDir, b.min, b.max);
-        if (t < best) best = t;
-      }
+      if (camBlockers) for (const b of camBlockers) test(b.min, b.max);
       const want = Math.max(1.6, best - 0.45);
       // acercarse rápido, alejarse despacito
       colDist.current = want < colDist.current ? want : colDist.current + (want - colDist.current) * (1 - Math.exp(-4 * dt));

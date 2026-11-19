@@ -53,7 +53,7 @@ export const StickView = forwardRef<HTMLDivElement, { size: number; knobRef?: Re
 );
 
 /** Joystick, arrastrar para girar la cámara y botón de saltar, en la posición y tamaño que elija la niña */
-export function TouchControls() {
+export function TouchControls({ hideJump = false }: { hideJump?: boolean }) {
   const { w, h } = useViewportSize();
   const saved = useGame((s) => s.controls);
   const layout = saved ?? defaultLayout(w, h);
@@ -141,7 +141,7 @@ export function TouchControls() {
     <>
       <div className="absolute inset-0 z-10" style={{ touchAction: 'none' }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
       <StickView ref={base} knobRef={knob} size={layout.stickSize} className="pointer-events-none z-20" style={{ left: pos.stick.x, top: pos.stick.y, opacity: 0.55 }} />
-      <JumpButtonView
+      {!hideJump && <JumpButtonView
         ref={jumpBtn}
         size={pos.jump.size}
         className="z-20"
@@ -150,7 +150,7 @@ export function TouchControls() {
         onPointerUp={release}
         onPointerCancel={release}
         onPointerLeave={release}
-      />
+      />}
     </>
   );
 }

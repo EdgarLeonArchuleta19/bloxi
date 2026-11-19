@@ -4,6 +4,7 @@ import { DEFAULT_AVATAR, type AvatarConfig } from './data/items';
 import { CityLevel } from './game/levels/City';
 import { ColorFloorLevel } from './game/levels/ColorFloor';
 import { LavaLevel } from './game/levels/LavaFloor';
+import { RaceLevel } from './game/levels/Race';
 import { ObbyLevel } from './game/levels/Obby';
 import { StarIslandLevel } from './game/levels/StarIsland';
 import type { ThumbShot } from './game/PlayWorld';
@@ -19,6 +20,10 @@ const SHOTS: Record<string, { shot: ThumbShot; avatar: Partial<AvatarConfig> }> 
   city: {
     shot: { player: [12.5, 0, -12.2], cam: [5.5, 4.2, -3.2], look: [14.5, 2.8, -17.5] },
     avatar: { hat: 'bow', glasses: 'heart' },
+  },
+  race: {
+    shot: { player: [0, 0, 0], cam: [0, 0, 0], look: [0, 0, 0] },
+    avatar: { hat: 'cap', glasses: 'sun' },
   },
   lava: {
     shot: { player: [0, 1.0, -11.4], cam: [7, 7.5, 6], look: [0.5, 0.6, -5] },
@@ -50,6 +55,7 @@ export function ThumbScene({ id }: { id: string }) {
         {id === 'obby' && <ObbyLevel avatar={avatar} thumb={cfg.shot} />}
         {id === 'city' && <CityLevel avatar={avatar} thumb={cfg.shot} />}
         {id === 'lava' && <LavaLevel avatar={avatar} thumb={cfg.shot} />}
+        {id === 'race' && <RaceLevel avatar={avatar} thumb={cfg.shot} />}
       </Canvas>
     </div>
   );

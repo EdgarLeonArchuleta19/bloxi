@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AvatarConfig } from '../../data/items';
 import { input } from '../../lib/input';
@@ -10,8 +10,11 @@ import { Bursts, Cloud, burst } from '../fx';
 import type { Solid } from '../physics';
 import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../PlayWorld';
 import { setActionHandler, setActions, useRun, type RunAction } from '../runStore';
-import { CITY_HALF, CITY_SPAWN, SHOPS, TREES, VEHICLES, buildCity, type ShopId, type VehicleSpec } from './cityData';
-import { CarModel, HouseDecor, MotoModel, ParkDecor, Roads, ShopsDecor, Signs, TreeTops, Windows } from './cityModels';
+import { CITY_HALF, CITY_SPAWN, FAIR, PALMS, SHOPS, TRAFFIC_LOOPS, TREES, VEHICLES, buildCity, type ShopId, type VehicleSpec } from './cityData';
+import {
+  Apartments, CarModel, FairDecor, FireStationDecor, HouseDecor, LakeDecor, MotoModel, PET_KINDS, ParkDecor, PetModel, PetShopDecor, Roads,
+  SchoolDecor, ShopsDecor, Signs, TreeTops, WHEEL_R, WHEEL_Y, Windows, carouselAngle, wheelAngle, type PetKind,
+} from './cityModels';
 import { NAMES, nameTag, randomAvatar } from './colorBots';
 import { Coins, type CoinData } from './pickups';
 
@@ -30,7 +33,17 @@ const PHRASES = [
   '¡Súbete a la moto! 🏍️',
 ];
 const FRIEND_PHRASES = ['¡Sí! ¡Ahora somos amigos! 💖', '¡Yupi! ¡Amigos para siempre! 🌈', '¡Te voy a seguir a todos lados! 😄'];
-const PRICES: Partial<Record<ShopId, number>> = { icecream: 3, pizza: 3, balloons: 2, fountain: 1 };
+const PRICES: Partial<Record<ShopId, number>> = { icecream: 3, pizza: 3, balloons: 2, fountain: 1, pets: 5 };
+const FACTS = [
+  '📚 ¡Las jirafas duermen solo 2 horas al día! 🦒',
+  '📚 ¡El corazón de una ballena es tan grande como un carro! 🐳',
+  '📚 ¡Las mariposas prueban con las patitas! 🦋',
+  '📚 ¡Los pingüinos se proponen matrimonio con piedritas! 🐧',
+  '📚 ¡Un pulpo tiene 3 corazones! 🐙',
+  '📚 ¡La luz del sol tarda 8 minutos en llegar a la Tierra! ☀️',
+  '📚 ¡Las abejas bailan para platicar! 🐝',
+  '📚 ¡Los delfines duermen con un ojo abierto! 🐬',
+];
 const MAX_FRIENDS = 6;
 
 interface Npc {
@@ -97,7 +110,10 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const { platforms, apartments } = useMemo(buildCity, []);
   // copas de los árboles: la cámara no se mete en ellas
   const canopies = useMemo(
-    () => TREES.map(([x, z]) => ({ min: new THREE.Vector3(x - 1.6, 1.8, z - 1.6), max: new THREE.Vector3(x + 1.6, 5, z + 1.6) })),
+    () => [
+      ...TREES.map(([x, z]) => ({ min: new THREE.Vector3(x - 1.6, 1.8, z - 1.6), max: new THREE.Vector3(x + 1.6, 5, z + 1.6) })),
+      ...PALMS.map(([x, z]) => ({ min: new THREE.Vector3(x - 1.8, 3.6, z - 1.8), max: new THREE.Vector3(x + 2.2, 5.6, z + 1.8) })),
+    ],
     [],
   );
   const engine = useRef<Engine | null>(null);
@@ -105,25 +121,50 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const solids = (): Solid[] => engine.current?.solids ?? [];
 
   /** ¿Choca un círculo con algo sólido? (edificios, troncos, bardas) */
-  const hits = (x: number, z: number, r: number) => {
+  // ⚡ rejilla espacial: cada consulta solo revisa las cosas de su zona (no toda la ciudad)
+  const CELL = 12;
+  const grid = useRef<Map<number, Solid[]> | null>(null);
+  const cellKey = (cx: number, cz: number) => (cx + 100) * 1000 + (cz + 100);
+  const getGrid = () => {
+    if (grid.current) return grid.current;
+    const g = new Map<number, Solid[]>();
     const list = solids();
     for (let i = 1; i < list.length; i++) {
       const s = list[i];
-      if (s.max.y < 0.4) continue;
-      const dx = Math.max(s.min.x - x, 0, x - s.max.x);
-      const dz = Math.max(s.min.z - z, 0, z - s.max.z);
-      if (dx * dx + dz * dz < r * r) return true;
+      for (let cx = Math.floor(s.min.x / CELL); cx <= Math.floor(s.max.x / CELL); cx++)
+        for (let cz = Math.floor(s.min.z / CELL); cz <= Math.floor(s.max.z / CELL); cz++) {
+          const k = cellKey(cx, cz);
+          const arr = g.get(k);
+          if (arr) arr.push(s);
+          else g.set(k, [s]);
+        }
     }
+    if (list.length > 1) grid.current = g;
+    return g;
+  };
+  const near = (x: number, z: number, r: number, fn: (s: Solid) => boolean) => {
+    const g = getGrid();
+    for (let cx = Math.floor((x - r) / CELL); cx <= Math.floor((x + r) / CELL); cx++)
+      for (let cz = Math.floor((z - r) / CELL); cz <= Math.floor((z + r) / CELL); cz++) {
+        const arr = g.get(cellKey(cx, cz));
+        if (arr) for (const s of arr) if (fn(s)) return true;
+      }
     return false;
   };
+  const hits = (x: number, z: number, r: number) =>
+    near(x, z, r, (s) => {
+      if (s.max.y < 0.4) return false;
+      const dx = Math.max(s.min.x - x, 0, x - s.max.x);
+      const dz = Math.max(s.min.z - z, 0, z - s.max.z);
+      return dx * dx + dz * dz < r * r;
+    });
   const groundAt = (x: number, z: number) => {
     let top = 0;
-    const list = solids();
-    for (let i = 1; i < list.length; i++) {
-      const s = list[i];
-      if (s.max.y > 1.2 || s.spec.hidden) continue; // solo cosas bajitas (fuente, kiosko)
-      if (x > s.min.x && x < s.max.x && z > s.min.z && z < s.max.z) top = Math.max(top, s.max.y);
-    }
+    near(x, z, 0.1, (s) => {
+      // solo cosas bajitas (fuente, kiosko, carrusel)
+      if (s.max.y <= 1.2 && !s.spec.hidden && x > s.min.x && x < s.max.x && z > s.min.z && z < s.max.z) top = Math.max(top, s.max.y);
+      return false;
+    });
     return top;
   };
   const randomSpot = (near?: THREE.Vector3, radius = 26): THREE.Vector3 => {
@@ -157,8 +198,11 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       make(f.name, f.avatar, true, new THREE.Vector3(CITY_SPAWN[0] + (i % 3) * 1.6 - 1.6, 0, CITY_SPAWN[2] - 1.5 - Math.floor(i / 3) * 1.6), i),
     );
     const names = NAMES.filter((n) => !used.has(n)).sort(() => Math.random() - 0.5);
-    const starts: [number, number][] = [[-12, -8], [8, -12], [14, 10], [-20, 10], [-6, 30], [30, -30], [6, 40], [-40, -6]];
-    for (let i = 0; i < 8; i++) list.push(make(names[i], randomAvatar(), false, new THREE.Vector3(starts[i][0], 0, starts[i][1])));
+    const starts: [number, number][] = [
+      [-12, -8], [8, -12], [14, 10], [-20, 10], [-6, 30], [30, -30], [6, 40], [-40, -6],
+      [-50, 10], [48, -12], [60, 30], [-60, -30], [20, -46], [-30, 66],
+    ];
+    for (let i = 0; i < starts.length; i++) list.push(make(names[i % names.length], randomAvatar(), false, new THREE.Vector3(starts[i][0], 0, starts[i][1])));
     if (thumb)
       list.forEach((n, i) => {
         n.pos.set(thumb.player[0] + (i % 2 ? 2.4 : -2.4) + (i > 1 ? (i % 2 ? 1.5 : -1.5) : 0), 0, thumb.player[2] - 1 - (i > 1 ? 2.2 : 0));
@@ -174,11 +218,21 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const friendCount = () => npcs.filter((n) => n.friend).length;
 
   // 🪙 monedas por la ciudad
-  const coins = useMemo<CoinData[]>(() => Array.from({ length: 28 }, () => ({ pos: new THREE.Vector3(), taken: true, t: 1 })), []);
+  const coins = useMemo<CoinData[]>(() => Array.from({ length: 44 }, () => ({ pos: new THREE.Vector3(), taken: true, t: 1 })), []);
   const coinTimers = useRef<number[]>(coins.map((_, i) => 0.5 + i * 0.05));
 
   const holdT = useRef(0);
   const actAcc = useRef(0);
+  // 🎡🎠 paseo en la feria
+  const ride = useRef<{ kind: 'wheel' | 'carousel'; t: number } | null>(null);
+  // 🐾 mascota
+  const petKind = useGame((s) => s.cityPet) as PetKind | null;
+  const pet = useRef({ pos: new THREE.Vector3(CITY_SPAWN[0] + 1.5, 0, CITY_SPAWN[2]), facing: 0, speed: 0 });
+  // 🚕 tráfico
+  const traffic = useMemo(
+    () => TRAFFIC_LOOPS.map((l) => ({ ...l, seg: 0, t: Math.random(), pos: new THREE.Vector3(), heading: 0, v: l.speed })),
+    [],
+  );
   if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__city = { engine, vehicles, npcs, driving };
 
   const say = (n: Npc, text: string, secs = 3.5) => {
@@ -221,7 +275,30 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     e.anim.sit = true;
     e.anim.hold = undefined;
     sfx.engine();
-    useRun.getState().showToast(vehicles[i].spec.kind === 'car' ? '🚗 ¡A manejar! Usa el joystick' : '🏍️ ¡Agárrate fuerte!');
+    const k = vehicles[i].spec.kind;
+    useRun.getState().showToast(k === 'car' ? '🚗 ¡A manejar! Usa el joystick' : k === 'truck' ? '🚒 ¡Camión de bomberos! ¡Pip pip!' : '🏍️ ¡Agárrate fuerte!');
+  };
+
+  const startRide = (kind: 'wheel' | 'carousel') => {
+    const e = engine.current;
+    if (!e) return;
+    ride.current = { kind, t: kind === 'wheel' ? 16 : 11 };
+    e.anim.sit = true;
+    e.anim.cheer = 0;
+    sfx.star();
+    useRun.getState().showToast(kind === 'wheel' ? '🎡 ¡Arriba, arriba!' : '🎠 ¡Dando vueltas!');
+  };
+  const stopRide = () => {
+    const e = engine.current;
+    const r = ride.current;
+    if (!e || !r) return;
+    ride.current = null;
+    e.anim.sit = false;
+    e.followYaw = null;
+    e.cam.dist = 9;
+    const spot = SHOPS.find((s) => s.id === r.kind)!.spot;
+    e.ctrl.reset(new THREE.Vector3(spot[0], 0, spot[1]), e.ctrl.facing);
+    e.anim.cheer = 1.2;
   };
 
   const stopDriving = () => {
@@ -259,7 +336,7 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       if (!e) return;
       const run = useRun.getState();
       if (id.startsWith('veh:')) return startDriving(Number(id.slice(4)));
-      if (id === 'exit') return stopDriving();
+      if (id === 'exit') return ride.current ? stopRide() : stopDriving();
       if (id === 'horn') {
         sfx.horn();
         npcs.forEach((n) => {
@@ -335,6 +412,29 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
               });
             }, 2200);
             break;
+          case 'pets': {
+            const kinds = PET_KINDS.map((p) => p.kind);
+            const next = kinds[(kinds.indexOf(useGame.getState().cityPet as PetKind) + 1) % kinds.length];
+            useGame.getState().setCityPet(next);
+            pet.current.pos.set(e.ctrl.pos.x + 1.4, 0, e.ctrl.pos.z);
+            const info = PET_KINDS.find((p) => p.kind === next)!;
+            sfx.star();
+            burst(e.ctrl.pos.clone().setY(1.2), '#ff9a3c', 24);
+            e.anim.cheer = 1.5;
+            run.showToast(`${info.emoji} ¡Adoptaste un ${info.name}! Te va a seguir`);
+            break;
+          }
+          case 'school':
+            sfx.hello();
+            e.anim.cheer = 1.2;
+            run.showToast(FACTS[Math.floor(Math.random() * FACTS.length)]);
+            break;
+          case 'wheel':
+            startRide('wheel');
+            break;
+          case 'carousel':
+            startRide('carousel');
+            break;
           case 'clothes':
             run.set({ overlay: 'closet', status: 'paused' });
             break;
@@ -349,6 +449,10 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const updateActions = () => {
     const e = engine.current;
     if (!e) return;
+    if (ride.current) {
+      setActions([{ id: 'exit', label: '🚪 Bajarme', tone: 'white' }]);
+      return;
+    }
     if (driving.current >= 0) {
       setActions([
         { id: 'exit', label: '🚪 Bajarme', tone: 'white' },
@@ -360,7 +464,9 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     const opts: (RunAction & { d: number })[] = [];
     vehicles.forEach((v, i) => {
       const d = Math.hypot(v.pos.x - p.x, v.pos.z - p.z);
-      if (d < 3.4) opts.push({ id: `veh:${i}`, label: v.spec.kind === 'car' ? '🚗 Manejar' : '🏍️ Subir a la moto', tone: 'sky', d });
+      const r = v.spec.kind === 'truck' ? 4.2 : 3.4;
+      const label = v.spec.kind === 'car' ? '🚗 Manejar' : v.spec.kind === 'truck' ? '🚒 Manejar camión' : '🏍️ Subir a la moto';
+      if (d < r) opts.push({ id: `veh:${i}`, label, tone: 'sky', d });
     });
     for (const s of SHOPS) {
       const d = Math.hypot(s.spot[0] - p.x, s.spot[1] - p.z);
@@ -368,6 +474,10 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       const price = PRICES[s.id];
       const label =
         s.id === 'house' ? '😴 Tomar una siesta' :
+        s.id === 'pets' ? (petKind ? `🐾 Cambiar mascota · ${price}🪙` : `🐶 Adoptar mascota · ${price}🪙`) :
+        s.id === 'school' ? '📚 Aprender algo' :
+        s.id === 'wheel' ? '🎡 Subir a la rueda' :
+        s.id === 'carousel' ? '🎠 Subir al carrusel' :
         s.id === 'clothes' ? '👗 Probarme ropa' :
         s.id === 'icecream' ? `🍦 Helado · ${price}🪙` :
         s.id === 'pizza' ? `🍕 Pizza · ${price}🪙` :
@@ -399,6 +509,8 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     const isDriving = driving.current >= 0;
     let fi = 0;
     for (const n of npcs) {
+      // ⚡ los bots muy lejos se quedan quietos (no se ven)
+      if (!n.friend && Math.abs(n.pos.x - p.x) + Math.abs(n.pos.z - p.z) > 110) continue;
       if (n.bubbleT > 0) {
         n.bubbleT -= dt;
         if (n.bubbleT <= 0) n.bubble = null;
@@ -472,15 +584,89 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     }
   };
 
+  /** 🚕 Carros que circulan solos (se paran si estás enfrente) */
+  const updateTraffic = (dt: number, e: Engine) => {
+    for (const c of traffic) {
+      const a = c.path[c.seg], b = c.path[(c.seg + 1) % c.path.length];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const fx = (b[0] - a[0]) / len, fz = (b[1] - a[1]) / len;
+      // ¿hay alguien enfrente?
+      const px = e.ctrl.pos.x - c.pos.x, pz = e.ctrl.pos.z - c.pos.z;
+      const ahead = px * fx + pz * fz;
+      const side = Math.abs(px * fz - pz * fx);
+      const blocked = ahead > 0 && ahead < 9 && side < 2.8;
+      const want = blocked ? 0 : c.speed;
+      c.v += (want - c.v) * (1 - Math.exp(-(blocked ? 6 : 1.5) * dt));
+      c.t += (c.v * dt) / len;
+      if (c.t >= 1) {
+        c.t -= 1;
+        c.seg = (c.seg + 1) % c.path.length;
+      }
+      // carril derecho
+      const x = a[0] + (b[0] - a[0]) * c.t + fz * 2.2;
+      const z = a[1] + (b[1] - a[1]) * c.t - fx * 2.2;
+      c.pos.set(x, 0, z);
+      const h = Math.atan2(fx, fz);
+      let dh = h - c.heading;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      c.heading += dh * (1 - Math.exp(-5 * dt));
+    }
+  };
+
+  /** 🐾 La mascota camina junto a ti */
+  const updatePet = (dt: number, e: Engine) => {
+    if (!petKind) return;
+    const p = pet.current;
+    const h = e.ctrl.facing;
+    const tx = e.ctrl.pos.x + Math.cos(h) * 1.3 - Math.sin(h) * 0.6;
+    const tz = e.ctrl.pos.z - Math.sin(h) * 1.3 - Math.cos(h) * 0.6;
+    const dx = tx - p.pos.x, dz = tz - p.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 25) p.pos.set(tx, 0, tz);
+    const speed = d > 3 ? 9 : d > 0.4 ? 4 : 0;
+    if (speed > 0) {
+      const step = Math.min(d, speed * dt);
+      p.pos.x += (dx / d) * step;
+      p.pos.z += (dz / d) * step;
+      let df = Math.atan2(dx, dz) - p.facing;
+      df = Math.atan2(Math.sin(df), Math.cos(df));
+      p.facing += df * (1 - Math.exp(-10 * dt));
+    }
+    p.speed = speed;
+    p.pos.y = groundAt(p.pos.x, p.pos.z);
+  };
+
   const hooks = useRef<LevelHooks>({});
   hooks.current = {
     onFall: (e) => e.ctrl.reset(spawn, e.ctrl.facing),
     control: (e, dt) => {
-      if (thumb || driving.current < 0) return false;
+      if (thumb) return false;
+      if (ride.current) {
+        const r = ride.current;
+        r.t -= dt;
+        if (r.kind === 'wheel') {
+          const a = wheelAngle(); // la góndola 0
+          e.ctrl.pos.set(FAIR.wheel[0] + Math.cos(a) * WHEEL_R, WHEEL_Y + Math.sin(a) * WHEEL_R - 1.55, FAIR.wheel[1]);
+          e.ctrl.facing = 0;
+          e.followYaw = 0;
+          e.cam.dist = 15;
+        } else {
+          const a = carouselAngle();
+          e.ctrl.pos.set(FAIR.carousel[0] + Math.cos(a) * 2.6, 1.15 + Math.sin(performance.now() / 500) * 0.3, FAIR.carousel[1] - Math.sin(a) * 2.6);
+          e.ctrl.facing = a + Math.PI;
+          e.followYaw = a + Math.PI * 1.5;
+          e.cam.dist = 10;
+        }
+        e.ctrl.vel.set(0, 0, 0);
+        if (r.t <= 0) stopRide();
+        return true;
+      }
+      if (driving.current < 0) return false;
       const veh = vehicles[driving.current];
       const moto = veh.spec.kind === 'moto';
-      const maxV = moto ? 19 : 15;
-      const accel = moto ? 15 : 12;
+      const truck = veh.spec.kind === 'truck';
+      const maxV = moto ? 19 : truck ? 12 : 15;
+      const accel = moto ? 15 : truck ? 9 : 12;
       const thr = useRun.getState().status === 'playing' ? input.moveY : 0;
       const steer = useRun.getState().status === 'playing' ? input.moveX : 0;
       if (thr > 0.1) veh.v = Math.min(maxV, veh.v + accel * thr * dt);
@@ -492,7 +678,7 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       veh.lean += ((moto ? -turn * 0.16 : 0) - veh.lean) * (1 - Math.exp(-6 * dt));
       const nx = veh.pos.x + Math.sin(veh.heading) * veh.v * dt;
       const nz = veh.pos.z + Math.cos(veh.heading) * veh.v * dt;
-      if (hits(nx, nz, moto ? 0.8 : 1.5)) {
+      if (hits(nx, nz, moto ? 0.8 : truck ? 2 : 1.5)) {
         if (Math.abs(veh.v) > 3) {
           sfx.bump();
           burst(veh.pos.clone().setY(1.2), '#ffffff', 10);
@@ -503,19 +689,21 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         veh.pos.z = nz;
       }
       // la niña sentada en el asiento
-      const seatZ = moto ? -0.25 : -0.35;
-      const seatY = moto ? 0.5 : 0.47;
+      const seatZ = moto ? -0.25 : truck ? -0.45 : -0.35;
+      const seatY = moto ? 0.5 : truck ? 0.61 : 0.47;
       e.ctrl.pos.set(veh.pos.x + Math.sin(veh.heading) * seatZ, seatY, veh.pos.z + Math.cos(veh.heading) * seatZ);
       e.ctrl.vel.set(0, 0, 0);
       e.ctrl.facing = veh.heading;
       e.followYaw = veh.heading + Math.PI;
-      e.cam.dist = moto ? 10.5 : 12;
+      e.cam.dist = moto ? 10.5 : truck ? 14 : 12;
       return true;
     },
     onTick: (e, dt) => {
       if (thumb) return;
       const run = useRun.getState();
       updateNpcs(dt, e);
+      updateTraffic(dt, e);
+      updatePet(dt, e);
       // monedas
       const c = e.ctrl.pos.clone();
       c.y += 1.1;
@@ -562,7 +750,7 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
 
   return (
     <>
-      <fog attach="fog" args={['#d7eeff', 45, 140]} />
+      <fog attach="fog" args={['#d7eeff', 50, 175]} />
       <PlayWorld
         platforms={platforms}
         spawn={spawn}
@@ -577,7 +765,18 @@ export function CityLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       />
       <Roads />
       <TreeTops />
+      <Apartments buildings={apartments} />
       <Windows buildings={apartments} />
+      <PetShopDecor />
+      <SchoolDecor />
+      <FireStationDecor />
+      <FairDecor />
+      <LakeDecor />
+      {traffic.map((c, i) => (
+        <TrafficCar key={i} car={c} />
+      ))}
+      {petKind && !thumb && <PetView kind={petKind} pet={pet} hidden={() => driving.current >= 0 || !!ride.current} />}
+      <FarCamera />
       <HouseDecor />
       <ShopsDecor />
       <ParkDecor />
@@ -613,7 +812,70 @@ function VehicleView({ veh, innerRef }: { veh: Vehicle; innerRef: (o: THREE.Grou
       position={veh.pos}
       rotation={[0, veh.heading, 0]}
     >
-      {veh.spec.kind === 'car' ? <CarModel color={veh.spec.color} /> : <MotoModel color={veh.spec.color} />}
+      {veh.spec.kind === 'moto' ? (
+        <MotoModel color={veh.spec.color} />
+      ) : veh.spec.kind === 'truck' ? (
+        <group scale={1.3}>
+          <CarModel color={veh.spec.color} />
+          {/* escalera de bomberos */}
+          <mesh castShadow position={[0, 1.9, -0.6]}>
+            <boxGeometry args={[0.7, 0.12, 3.2]} />
+            <meshStandardMaterial color="#d9d9e3" metalness={0.5} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 1.95, 1]}>
+            <sphereGeometry args={[0.18, 10, 8]} />
+            <meshStandardMaterial color="#3cb7f5" emissive="#3cb7f5" emissiveIntensity={0.8} />
+          </mesh>
+        </group>
+      ) : (
+        <CarModel color={veh.spec.color} />
+      )}
+    </group>
+  );
+}
+
+/** Cámara: ver más lejos en la ciudad grande */
+function FarCamera() {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  useEffect(() => {
+    camera.far = 200;
+    camera.updateProjectionMatrix();
+  }, [camera]);
+  return null;
+}
+
+function TrafficCar({ car }: { car: { pos: THREE.Vector3; heading: number; color: string } }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(() => {
+    if (!ref.current) return;
+    ref.current.position.copy(car.pos);
+    ref.current.rotation.y = car.heading;
+  });
+  return (
+    <group ref={ref}>
+      <CarModel color={car.color} />
+    </group>
+  );
+}
+
+function PetView({ kind, pet, hidden }: { kind: PetKind; pet: React.RefObject<{ pos: THREE.Vector3; facing: number; speed: number }>; hidden: () => boolean }) {
+  const ref = useRef<THREE.Group>(null);
+  const legs = useRef<(THREE.Mesh | null)[]>([]);
+  useFrame((s) => {
+    const g = ref.current;
+    if (!g) return;
+    const p = pet.current;
+    g.visible = !hidden();
+    g.position.copy(p.pos);
+    g.rotation.y = p.facing;
+    const t = s.clock.elapsedTime * (kind === 'bunny' ? 9 : 12);
+    const moving = p.speed > 0;
+    if (kind === 'bunny') g.position.y += moving ? Math.abs(Math.sin(t)) * 0.35 : 0;
+    legs.current.forEach((l, i) => l && (l.rotation.x = moving ? Math.sin(t + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)) * 0.6 : 0));
+  });
+  return (
+    <group ref={ref}>
+      <PetModel kind={kind} legs={legs} />
     </group>
   );
 }
@@ -624,11 +886,13 @@ function NpcsView({ npcs }: { npcs: Npc[] }) {
   const tags = useMemo(() => npcs.map((n) => nameTag(n.friend ? `💖 ${n.name}` : n.name)), [npcs]);
   const friendTags = useMemo(() => npcs.map((n) => nameTag(`💖 ${n.name}`)), [npcs]);
   const tagRefs = useRef<(THREE.Sprite | null)[]>([]);
-  useFrame(() => {
+  useFrame((state) => {
+    const cam = state.camera.position;
     npcs.forEach((n, i) => {
       const g = groups.current[i];
       if (!g) return;
-      g.visible = !n.hidden;
+      // ⚡ los que están muy lejos no se dibujan
+      g.visible = !n.hidden && (n.friend || cam.distanceTo(n.pos) < 75);
       g.position.copy(n.pos);
       g.rotation.y = n.facing;
       const b = bubbles.current[i];

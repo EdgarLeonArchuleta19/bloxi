@@ -10,13 +10,14 @@ import { AvatarEditor } from '../screens/AvatarEditor';
 import { CityLevel } from './levels/City';
 import { COLOR_ROUNDS, ColorFloorLevel } from './levels/ColorFloor';
 import { LAVA_ROUNDS, LavaLevel } from './levels/LavaFloor';
+import { RACE_LAPS, RaceLevel } from './levels/Race';
 import { STAR_TIME, StarIslandLevel } from './levels/StarIsland';
 import { triggerAction, useRun } from './runStore';
 import { backToLobby, leaveRoom, startRoomGame, useRoom } from '../net/room';
 import { ControlsEditor } from './ControlsEditor';
 import { TouchControls } from './TouchControls';
 
-export type GameId = 'obby' | 'stars' | 'colors' | 'city' | 'lava';
+export type GameId = 'obby' | 'stars' | 'colors' | 'city' | 'lava' | 'race';
 
 export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId; onExit: () => void; stage?: number; net?: boolean }) {
   // en sala el menú no detiene el juego (los demás siguen jugando)
@@ -87,11 +88,12 @@ export function GameScreen({ id, onExit, stage = 0, net = false }: { id: GameId;
         {id === 'colors' && <ColorFloorLevel avatar={avatar} />}
         {id === 'city' && <CityLevel avatar={avatar} />}
         {id === 'lava' && <LavaLevel avatar={avatar} />}
+        {id === 'race' && <RaceLevel avatar={avatar} />}
       </Canvas>
 
-      {status !== 'done' && <TouchControls />}
+      {status !== 'done' && <TouchControls hideJump={id === 'race'} />}
       <Hud id={id} onPause={() => (net ? setMenu(true) : useRun.getState().set({ status: 'paused' }))} />
-      {(id === 'colors' || id === 'lava' || id === 'city') && <ColorBanner />}
+      {(id === 'colors' || id === 'lava' || id === 'city' || id === 'race') && <ColorBanner />}
       <ActionButtons />
       <Toast />
       <ClosetOverlay />
@@ -189,7 +191,13 @@ function Hud({ id, onPause }: { id: GameId; onPause: () => void }) {
       </button>
 
       <div className="flex items-center gap-3 rounded-full bg-white/95 px-5 py-2 text-2xl font-bold shadow-[0_5px_0_rgba(51,38,77,0.12)] max-sm:gap-2 max-sm:px-3 max-sm:text-lg short:py-1 short:text-lg">
-        {id === 'city' ? (
+        {id === 'race' ? (
+          <>
+            <span className="tabular-nums">🏁 Vuelta {Math.max(1, round)}/{RACE_LAPS}</span>
+            <span className="h-6 w-0.5 rounded bg-ink/15" />
+            <span className="tabular-nums">📍 Lugar {checkpoint}/{players}</span>
+          </>
+        ) : id === 'city' ? (
           <>
             <span>🏙️ Mi Ciudad</span>
             <span className="h-6 w-0.5 rounded bg-ink/15" />
