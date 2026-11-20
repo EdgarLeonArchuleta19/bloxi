@@ -114,6 +114,9 @@ El catálogo tiene **buscador y categorías**, así que está listo para muchos 
 | 🎨 Piso de Colores | Todos en el mismo piso; gana el último en pie. Opción de **rellenar con bots** hasta 8 jugadores |
 | ⭐ Atrapa Estrellas | Todos compiten por las mismas estrellas; gana quien junte más. Opción de **rellenar con bots** hasta 5 |
 | ☁️ Carrera en el Obby | Se ven todos corriendo; gana quien llegue primero a la meta |
+| 🏎️ Carreritas | Cada quien maneja su kart en la misma pista; gana quien termine primero las 3 vueltas. Opción de **rellenar con bots** hasta 6 |
+| 🌋 El Piso es Lava | Todos en la misma sala; suena la alarma para todos a la vez y gana el último en pie. Opción de **rellenar con bots** hasta 8 |
+| 🚔 Escapa de la Cárcel | Cada quien hace su escape (llave, tarjeta, reflectores) y se ven todos; gana quien llegue primero al globo |
 
 - Hasta 8 jugadores. **Solo entra quien tenga el código**: no hay salas públicas ni chat.
 - Los dispositivos se conectan **directo entre ellos** (WebRTC con [PeerJS](https://peerjs.com)). Solo se comparte el nombre y el outfit del Bloxi con quienes están en la sala.

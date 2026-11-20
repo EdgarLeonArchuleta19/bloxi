@@ -13,6 +13,9 @@ import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../Play
 import { useRun } from '../runStore';
 import { CarModel, signMat } from './cityModels';
 import { NAMES, nameTag, randomAvatar } from './colorBots';
+import { netMode, useRoom } from '../../net/room';
+import { NetSync, getRemote, type PosEntry } from '../../net/remote';
+import { usePlaces } from '../../net/places';
 
 // 🏎️ Carreritas: 3 vueltas contra 5 bots. Pedal verde = acelerar, joystick = girar (abajo = frenar).
 
@@ -83,9 +86,15 @@ interface Racer {
   rubber: number; // los bots aceleran si van atrás de ti
   steer: number; // volante suavizado
   isPlayer: boolean;
+  /** en sala: lo maneja otra persona (o es un bot del anfitrión) y nos llega su posición */
+  remote: boolean;
+  gone: boolean; // se salió de la sala
+  sent: boolean; // ya avisamos que llegó a la meta
 }
 
 export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: ThumbShot }) {
+  // solo = contra bots · host = maneja también a los bots de la sala · guest = ve a los demás
+  const mode = useMemo(() => (thumb ? 'solo' : netMode()), [thumb]);
   const track = useMemo(buildTrack, []);
   const engine = useRef<Engine | null>(null);
   const playerName = useGame((s) => s.name);
@@ -95,16 +104,22 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const racers = useMemo<Racer[]>(() => {
     const names = NAMES.filter((n) => !playerName || !n.toLowerCase().startsWith(playerName.toLowerCase().slice(0, 3))).sort(() => Math.random() - 0.5);
     const list: Racer[] = [];
-    for (let k = 0; k < BOTS + 1; k++) {
-      const isPlayer = k === 3; // sales en 4° lugar: ¡a rebasar!
+    // en sala: personas primero y luego los bots (todos ven la misma parrilla)
+    const room = useRoom.getState();
+    const net = mode === 'solo' ? null : [...room.players, ...room.botPlayers];
+    const total = net ? net.length : BOTS + 1;
+    for (let k = 0; k < total; k++) {
+      const who = net?.[k];
+      const isPlayer = who ? who.id === room.myId : k === 3; // solo: sales en 4° lugar, ¡a rebasar!
+      const remote = !!who && !isPlayer && !(mode === 'host' && who.bot);
       const row = Math.floor(k / 2);
       const idx = wrap(-14 - row * 11);
       const lane = k % 2 ? 3 : -3;
       const p = track.P[idx].clone().addScaledVector(track.R[idx], lane);
       list.push({
-        id: isPlayer ? 'me' : `bot${k}`,
-        name: isPlayer ? playerName : names[k % names.length],
-        cfg: isPlayer ? avatar : randomAvatar(),
+        id: who ? who.id : isPlayer ? 'me' : `bot${k}`,
+        name: isPlayer ? playerName : who ? who.name : names[k % names.length],
+        cfg: isPlayer ? avatar : who ? who.avatar : randomAvatar(),
         anim: makeAnim(),
         color: KART_COLORS[k % KART_COLORS.length],
         pos: p,
@@ -119,6 +134,9 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         rubber: 1,
         steer: 0,
         isPlayer,
+        remote,
+        gone: false,
+        sent: false,
       });
     }
     list.forEach((r) => (r.anim.sit = true));
@@ -194,8 +212,8 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     }
   };
 
-  /** Bots: siguen la pista con su carril; corren un poco más si van atrás de ti */
-  const driveBot = (r: Racer, dt: number) => {
+  /** Bots: siguen la pista con su carril; corren un poco más si van atrás de ti (en sala: del que va adelante) */
+  const driveBot = (r: Racer, dt: number, leader: number) => {
     const look = Math.floor(18 + r.v * 0.7);
     const ti = wrap(r.idx + look);
     const target = track.P[ti].clone().addScaledVector(track.R[ti], r.lane);
@@ -206,7 +224,7 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     // frenar un poquito en curvas cerradas
     const curve = track.T[r.idx].dot(track.T[wrap(r.idx + 45)]);
     // atrás de ti: un poquito más rápidos · muy adelante: un poquito más lentos
-    const gap = progress(me) - progress(r);
+    const gap = leader - progress(r);
     r.rubber = gap > 80 ? 1.05 : gap > 0 ? 1 : gap < -60 ? 0.82 : 0.92;
     const throttle = curve < 0.75 && r.v > MAX_V * 0.8 ? -0.1 : 1;
     // cambiar de carril para rebasar
@@ -217,8 +235,13 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
   const finishFor = (r: Racer) => {
     finishCount.current += 1;
     r.finished = finishCount.current;
-    if (!r.isPlayer) return;
-    const place = r.finished;
+    if (r.isPlayer) showFinish(r.finished);
+  };
+
+  /** Mi resultado con el lugar que me tocó */
+  const showFinish = (place: number) => {
+    const r = me;
+    if (useRun.getState().status === 'done') return;
     const bonus = [15, 10, 6][place - 1] ?? 3;
     const run = useRun.getState();
     run.addCoins(bonus);
@@ -233,15 +256,52 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       result: {
         emoji: medal ?? '🏁',
         title: place === 1 ? '¡Ganaste la carrera!' : `¡Llegaste en ${place}° lugar!`,
-        subtitle: `${RACE_LAPS} vueltas • Lugar ${place} de ${BOTS + 1} • +${bonus} de premio`,
+        subtitle: `${RACE_LAPS} vueltas • Lugar ${place} de ${racers.length} • +${bonus} de premio`,
         coins: useRun.getState().coins,
         record: false,
       },
     });
   };
 
+  // 👫 en sala el anfitrión reparte los lugares conforme van llegando
+  const places = usePlaces(mode, {
+    onMine: (place) => showFinish(place),
+    onAny: (id, place) => {
+      const r = racers.find((x) => x.id === id);
+      if (r) r.finished = place;
+    },
+    toast: (name, place) => `🏁 ¡${name} llegó ${place === 1 ? 'primero' : `en ${place}° lugar`}!`,
+  });
+
+  /** Kart de otro jugador: seguir suavecito lo que nos llega por la red */
+  const followRemote = (r: Racer, dt: number) => {
+    const d = getRemote(r.id);
+    if (!r.id.startsWith('bot') && !useRoom.getState().players.some((p) => p.id === r.id)) r.gone = true;
+    if (!d) return;
+    const [, x, , z, h, boost, prog] = d.raw;
+    if (Math.hypot(x - r.pos.x, z - r.pos.z) > 12) r.pos.set(x, 0, z);
+    else {
+      const k = 1 - Math.exp(-12 * dt);
+      r.pos.x += (x - r.pos.x) * k;
+      r.pos.z += (z - r.pos.z) * k;
+    }
+    let dh = h - r.heading;
+    dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+    r.heading += dh * (1 - Math.exp(-12 * dt));
+    r.boostT = boost > 0.5 ? 0.2 : 0;
+    r.lap = Math.floor(prog / N);
+    r.idx = wrap(prog);
+  };
+
+  /** Lo que mando de un kart: [id, x, -, z, dirección, turbo, avance en la pista, -] */
+  const entryOf = (r: Racer): PosEntry => [
+    r.id,
+    Math.round(r.pos.x * 100) / 100, 0, Math.round(r.pos.z * 100) / 100,
+    Math.round(r.heading * 100) / 100, r.boostT > 0 ? 1 : 0, progress(r), 0,
+  ];
+
   useLayoutEffect(() => {
-    useRun.getState().set({ round: 1, checkpoint: 4, players: BOTS + 1 });
+    useRun.getState().set({ round: 1, checkpoint: racers.indexOf(me) + 1, players: racers.length });
     if (thumb) return;
     const t = setTimeout(() => useRun.getState().showToast('🟢 ¡Deja apretado el pedal verde para acelerar!'), 3600);
     return () => clearTimeout(t);
@@ -264,24 +324,43 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
           me.steer += (want - me.steer) * (1 - Math.exp(-7 * dt));
           drive(me, dt, brake ? -1 : gas && run.status === 'playing' ? 1 : 0, me.steer);
         } else drive(me, dt, 0.3, 0);
-        for (const r of racers) if (!r.isPlayer) driveBot(r, dt);
-        // choques suaves entre karts
+        let leader = progress(me);
+        for (const r of racers) if (r.remote && !r.id.startsWith('bot')) leader = Math.max(leader, progress(r));
+        for (const r of racers) {
+          if (r.remote) followRemote(r, dt);
+          else if (!r.isPlayer) driveBot(r, dt, leader);
+        }
+        // choques suaves entre karts (a los de otros jugadores no los empujamos: cada quien mueve el suyo)
         for (let i = 0; i < racers.length; i++)
           for (let j = i + 1; j < racers.length; j++) {
             const a = racers[i], b = racers[j];
+            if ((a.remote && b.remote) || a.gone || b.gone) continue;
             const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
             const d = Math.hypot(dx, dz);
             if (d < 2.3 && d > 0.01) {
-              const push = (2.3 - d) / 2;
-              a.pos.x -= (dx / d) * push;
-              a.pos.z -= (dz / d) * push;
-              b.pos.x += (dx / d) * push;
-              b.pos.z += (dz / d) * push;
+              const push = a.remote || b.remote ? 2.3 - d : (2.3 - d) / 2;
+              if (!a.remote) {
+                a.pos.x -= (dx / d) * push;
+                a.pos.z -= (dz / d) * push;
+              }
+              if (!b.remote) {
+                b.pos.x += (dx / d) * push;
+                b.pos.z += (dz / d) * push;
+              }
               if ((a.isPlayer || b.isPlayer) && Math.random() < 0.3) sfx.bump();
             }
           }
         // ¿quién ya llegó?
-        for (const r of racers) if (!r.finished && r.lap > RACE_LAPS) finishFor(r);
+        for (const r of racers) {
+          if (r.finished || r.sent || r.remote || r.lap <= RACE_LAPS) continue;
+          if (mode === 'solo') finishFor(r);
+          else {
+            // en sala el anfitrión dice el lugar
+            r.sent = true;
+            if (r.isPlayer) places.iFinished();
+            else places.givePlace(r.id);
+          }
+        }
         // vueltas del jugador
         if (run.status === 'playing') {
           const shownLap = Math.min(RACE_LAPS, Math.max(1, me.lap));
@@ -299,8 +378,8 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
           hudAcc.current += dt;
           if (hudAcc.current > 0.2 || shownLap !== run.round) {
             hudAcc.current = 0;
-            const order = [...racers].sort((a, b) => (a.finished && b.finished ? a.finished - b.finished : a.finished ? -1 : b.finished ? 1 : progress(b) - progress(a)));
-            run.set({ round: shownLap, checkpoint: order.indexOf(me) + 1 });
+            const order = racers.filter((r) => !r.gone).sort((a, b) => (a.finished && b.finished ? a.finished - b.finished : a.finished ? -1 : b.finished ? 1 : progress(b) - progress(a)));
+            run.set({ round: shownLap, checkpoint: order.indexOf(me) + 1, players: order.length });
           }
           if (me.boostT > 0) {
             boostSfxT.current -= dt;
@@ -340,6 +419,9 @@ export function RaceLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       {racers.map((r) => (
         <KartView key={r.id} racer={r} />
       ))}
+      {mode !== 'solo' && (
+        <NetSync engine={engine} self={() => entryOf(me)} extra={mode === 'host' ? () => racers.filter((r) => !r.remote && !r.isPlayer).map(entryOf) : undefined} />
+      )}
       <Bursts />
       {[[-90, 22, -60, 3], [90, 26, -40, 2.6], [-80, 20, 90, 2.8], [80, 28, 90, 3], [0, 30, -110, 3.5], [0, 26, 120, 3]].map(([x, y, z, sc], i) => (
         <Cloud key={i} position={[x, y, z]} scale={sc} />
@@ -356,6 +438,7 @@ function KartView({ racer }: { racer: Racer }) {
   useFrame((s) => {
     const g = ref.current;
     if (!g) return;
+    g.visible = !racer.gone;
     g.position.copy(racer.pos);
     g.rotation.y = racer.heading;
     if (flame.current) {

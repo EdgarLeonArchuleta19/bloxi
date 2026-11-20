@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  createRoom, formatCode, joinRoom, leaveRoom, setRoomBots, setRoomGame, startRoomGame, useRoom, type NetGame, type NetPlayer,
+  BOT_FILL, createRoom, formatCode, joinRoom, leaveRoom, setRoomBots, setRoomGame, startRoomGame, useRoom, type NetGame, type NetPlayer,
 } from '../net/room';
 import { sfx } from '../lib/sound';
 import { CandyButton, ScreenHeader, Toggle } from '../ui/kit';
@@ -12,6 +12,9 @@ const ROOM_GAMES: { id: NetGame; label: string }[] = [
   { id: 'colors', label: 'Piso de Colores' },
   { id: 'stars', label: 'Atrapa Estrellas' },
   { id: 'obby', label: 'Carrera en el Obby' },
+  { id: 'race', label: 'Carreritas' },
+  { id: 'lava', label: 'El Piso es Lava' },
+  { id: 'jail', label: 'Escapa de la Cárcel' },
 ];
 
 export function Friends({ onBack, initialCode = '' }: { onBack: () => void; initialCode?: string }) {
@@ -171,19 +174,19 @@ function Lobby() {
                     }}
                     className={`rounded-[26px] border-4 p-1 transition-colors ${active ? 'border-grape' : 'border-transparent opacity-70'}`}
                   >
-                    <div className="mx-auto w-[min(100%,24vh)]">
+                    <div className="mx-auto w-[min(100%,16vh)]">
                       <GameThumb game={info} />
                     </div>
-                    <div className="mt-1 text-base font-bold short:text-sm">{active ? '✓ ' : ''}{g.label}</div>
+                    <div className="mt-1 text-sm font-bold leading-tight short:text-xs">{active ? '✓ ' : ''}{g.label}</div>
                   </motion.button>
                 );
               })}
             </div>
-            {(game === 'colors' || game === 'stars') && (
+            {BOT_FILL[game] && (
               <div className="mt-3 flex items-center justify-between gap-3 short:mt-2">
                 <div>
                   <div className="text-lg font-bold short:text-base">🤖 Rellenar con bots</div>
-                  <div className="text-sm text-ink/55">{game === 'colors' ? 'Completa hasta 8 jugadores' : 'Completa hasta 5 jugadores'}</div>
+                  <div className="text-sm text-ink/55">Completa hasta {BOT_FILL[game]} jugadores</div>
                 </div>
                 <Toggle on={bots} onChange={() => setRoomBots(!bots)} />
               </div>

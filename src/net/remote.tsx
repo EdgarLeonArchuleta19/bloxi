@@ -18,6 +18,7 @@ interface Remote {
   grounded: boolean;
   out: boolean;
   seen: boolean;
+  raw: PosEntry; // lo último que llegó tal cual (algunos juegos usan los campos a su modo)
 }
 
 const remotes = new Map<string, Remote>();
@@ -27,7 +28,7 @@ export function updateRemote(e: PosEntry) {
   if (id === useRoom.getState().myId) return;
   let r = remotes.get(id);
   if (!r) {
-    r = { pos: new THREE.Vector3(x, y, z), target: new THREE.Vector3(), facing: f, targetFacing: f, speed: 0, grounded: true, out: false, seen: true };
+    r = { pos: new THREE.Vector3(x, y, z), target: new THREE.Vector3(), facing: f, targetFacing: f, speed: 0, grounded: true, out: false, seen: true, raw: e };
     remotes.set(id, r);
   }
   r.target.set(x, y, z);
@@ -36,6 +37,12 @@ export function updateRemote(e: PosEntry) {
   r.grounded = g === 1;
   r.out = o === 1;
   r.seen = true;
+  r.raw = e;
+}
+
+/** Lo último que sabemos de otro jugador (o bot del anfitrión) */
+export function getRemote(id: string): Readonly<Remote> | undefined {
+  return remotes.get(id);
 }
 
 export function clearRemotes() {
@@ -48,7 +55,15 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * Manda mi posición ~12 veces por segundo.
  * El anfitrión además reenvía a todos las posiciones de todos (y de los bots).
  */
-export function NetSync({ engine, isOut, extra }: { engine: React.RefObject<Engine | null>; isOut?: () => boolean; extra?: () => PosEntry[] }) {
+export function NetSync({
+  engine, isOut, extra, self,
+}: {
+  engine: React.RefObject<Engine | null>;
+  isOut?: () => boolean;
+  extra?: () => PosEntry[];
+  /** en vez de la posición del personaje, mandar esto (ej. el kart en Carreritas) */
+  self?: () => PosEntry;
+}) {
   const acc = useRef(0);
   useFrame((_, dt) => {
     acc.current += dt;
@@ -58,11 +73,11 @@ export function NetSync({ engine, isOut, extra }: { engine: React.RefObject<Engi
     const room = useRoom.getState();
     if (!e || room.status !== 'playing') return;
     const c = e.ctrl;
-    const mine: PosEntry = [room.myId, round2(c.pos.x), round2(c.pos.y), round2(c.pos.z), round2(c.facing), round2(c.speed01), c.grounded ? 1 : 0, isOut?.() ? 1 : 0];
+    const mine: PosEntry = self ? self() : [room.myId, round2(c.pos.x), round2(c.pos.y), round2(c.pos.z), round2(c.facing), round2(c.speed01), c.grounded ? 1 : 0, isOut?.() ? 1 : 0];
     if (room.isHost) {
       const all: PosEntry[] = [mine];
       remotes.forEach((r, id) => {
-        if (!id.startsWith('bot')) all.push([id, round2(r.target.x), round2(r.target.y), round2(r.target.z), round2(r.targetFacing), r.speed, r.grounded ? 1 : 0, r.out ? 1 : 0]);
+        if (!id.startsWith('bot')) all.push(r.raw);
       });
       if (extra) all.push(...extra());
       broadcast({ t: 'state', s: all });

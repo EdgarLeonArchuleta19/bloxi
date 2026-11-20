@@ -13,11 +13,15 @@ import { bubbleMat } from './City';
 import { signMat } from './cityModels';
 import { nameTag } from './colorBots';
 import { Coins, type CoinData } from './pickups';
+import { netMode } from '../../net/room';
+import { NetSync, RemotePlayers } from '../../net/remote';
+import { usePlaces } from '../../net/places';
 
 // 🚔 Escapa de la Cárcel: llave → tarjeta (sin que te vean los guardias) → patio con reflectores → ¡al globo!
 
 export const JAIL_STEPS = 4;
 const FINISH_BONUS = 20;
+const PLACE_BONUS = [10, 6, 4];
 const GOALS = [
   '🔑 Busca la llave de tu celda',
   '💳 Toma la tarjeta de la oficina ¡sin que te vean!',
@@ -144,10 +148,16 @@ const lightPos = (i: number, t: number, out: THREE.Vector3) => {
 };
 
 export function JailLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: ThumbShot }) {
+  // en sala es una carrera: cada quien hace su escape y gana quien llegue primero al globo
+  const mode = useMemo(() => (thumb ? 'solo' : netMode()), [thumb]);
   const world = useMemo(buildJail, []);
   const engine = useRef<Engine | null>(null);
-  const spawn = useMemo(() => new THREE.Vector3(...CHECKPOINTS[0]), []);
-  const g = useRef({ step: 0, hasKey: false, hasCard: false, doorOpen: 0, gateOpen: 0, caughtT: 0, goalT: 0, time: 0, t: 0, winT: 0, balloonY: 0 });
+  const spawn = useMemo(() => {
+    const p = new THREE.Vector3(...CHECKPOINTS[0]);
+    if (mode !== 'solo') p.x += (Math.random() - 0.5) * 2.4;
+    return p;
+  }, [mode]);
+  const g = useRef({ step: 0, hasKey: false, hasCard: false, doorOpen: 0, gateOpen: 0, caughtT: 0, goalT: 0, time: 0, t: 0, winT: 0, balloonY: 0, sent: false });
 
   const guards = useMemo<Guard[]>(
     () =>
@@ -230,23 +240,32 @@ export function JailLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     useRun.getState().set({ banner: { name: '', color: '#ff5fa2', text: '🎈 ¡Adiós cárcel! ¡Eres libre!' }, bar: 0 });
   };
 
-  const report = () => {
+  /** Resultado (en sala, con el lugar que me tocó) */
+  const report = (place?: number) => {
     const s = g.current;
     const run = useRun.getState();
-    run.addCoins(FINISH_BONUS);
+    if (run.status === 'done') return;
+    const bonus = place ? PLACE_BONUS[place - 1] ?? 0 : 0;
+    run.addCoins(FINISH_BONUS + bonus);
     const m = Math.floor(s.time / 60), sec = Math.floor(s.time % 60);
+    const medal = place ? ['🥇', '🥈', '🥉'][place - 1] : undefined;
     run.set({
       status: 'done',
       banner: null,
       result: {
-        emoji: '🎈',
-        title: '¡Escapaste de la cárcel!',
-        subtitle: `Tiempo: ${m}:${String(sec).padStart(2, '0')}  •  +${FINISH_BONUS} de premio`,
+        emoji: medal ?? '🎈',
+        title: place ? (place === 1 ? '¡Escapaste primero!' : `¡Escapaste en ${place}° lugar!`) : '¡Escapaste de la cárcel!',
+        subtitle: `Tiempo: ${m}:${String(sec).padStart(2, '0')}  •  +${FINISH_BONUS + bonus} de premio`,
         coins: useRun.getState().coins,
         record: false,
       },
     });
   };
+
+  const places = usePlaces(mode, {
+    onMine: (place) => report(place),
+    toast: (name, place) => `🎈 ¡${name} escapó ${place === 1 ? 'primero' : `en ${place}° lugar`}!`,
+  });
 
   const hooks = useRef<LevelHooks>({});
   hooks.current = {
@@ -259,7 +278,14 @@ export function JailLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       e.ctrl.pos.set(BALLOON.x, 1.2 + s.balloonY, BALLOON.z);
       e.ctrl.vel.set(0, 0, 0);
       e.cam.dist = 13;
-      if (s.winT > 3 && useRun.getState().status === 'playing') report();
+      if (s.winT > 3 && useRun.getState().status === 'playing') {
+        if (mode === 'solo') report();
+        else if (!s.sent) {
+          // en sala: el anfitrión dice en qué lugar llegaste
+          s.sent = true;
+          places.iFinished(s.time);
+        }
+      }
       return true;
     },
     onFall: (e) => e.ctrl.reset(new THREE.Vector3(...CHECKPOINTS[g.current.step]), 0),
@@ -433,6 +459,12 @@ export function JailLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       <BalloonView g={g} />
       <Signs />
       <Coins coins={coins} />
+      {mode !== 'solo' && (
+        <>
+          <NetSync engine={engine} />
+          <RemotePlayers />
+        </>
+      )}
       <Bursts />
       {[[-50, 24, 20, 3], [50, 26, 60, 2.6], [-40, 22, 110, 2.8], [40, 28, 120, 3], [0, 30, -40, 3.5]].map(([x, y, z, sc], i) => (
         <Cloud key={i} position={[x, y, z]} scale={sc} />

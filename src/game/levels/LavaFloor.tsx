@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { AvatarConfig } from '../../data/items';
@@ -10,6 +10,9 @@ import type { PlatformSpec, Solid } from '../physics';
 import { PlayWorld, type Engine, type LevelHooks, type ThumbShot } from '../PlayWorld';
 import { useRun } from '../runStore';
 import { BotsView, makeBots, type Bot } from './colorBots';
+import { broadcast, netMode, onNetMessage, sendToHost, useRoom } from '../../net/room';
+import { NetSync, RemotePlayers, type PosEntry } from '../../net/remote';
+import { nameInRoom } from '../../net/places';
 
 // 🌋 El piso es lava: cuando suena la alarma, ¡súbete a un mueble antes de que el piso se vuelva lava!
 
@@ -51,13 +54,23 @@ function buildRoom(): PlatformSpec[] {
 const FIRST_FURNI = 5; // índice del primer mueble en los sólidos
 
 type Phase = 'wait' | 'safe' | 'warn' | 'lava' | 'over';
+type Ranking = { id: string; name: string; place: number }[];
 
 export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: ThumbShot }) {
+  // solo = contra bots · host = anfitrión de la sala (manda las alarmas) · guest = invitado (obedece)
+  const mode = useMemo(() => (thumb ? 'solo' : netMode()), [thumb]);
   const platforms = useMemo(buildRoom, []);
   const engine = useRef<Engine | null>(null);
-  const spawn = useMemo(() => new THREE.Vector3(0, 0, 6), []);
+  // en sala cada quien aparece en un lugar distinto de la sala
+  const spawn = useMemo(
+    () => (mode === 'solo' ? new THREE.Vector3(0, 0, 6) : new THREE.Vector3((Math.random() - 0.5) * 16, 0, (Math.random() - 0.5) * 12 + 3)),
+    [mode],
+  );
   const g = useRef({ phase: (thumb ? 'lava' : 'wait') as Phase, t: 1.5, dur: 1, round: 0, burnedThisRound: false, safeT: 0, lastBar: -1 });
   const playerName = useGame((s) => s.name);
+  const meOut = useRef(false);
+  const outOrder = useRef<string[]>([]); // anfitrión: orden en que se fueron eliminando
+  const humansOut = useRef(new Set<string>());
 
   const furniture = (): Solid[] => engine.current?.solids.slice(FIRST_FURNI) ?? [];
   const floor = (): Solid | undefined => engine.current?.solids[0];
@@ -67,10 +80,14 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     return top;
   };
 
-  // 🤖 bots
+  // 🤖 bots (solo: 7 al azar · anfitrión: los de la sala · invitado: los ve como jugadores remotos)
   const bots = useMemo<Bot[]>(() => {
-    const spots = Array.from({ length: LAVA_BOTS }, (_, i) => new THREE.Vector3(Math.cos(i * 0.9) * 9, 0, Math.sin(i * 0.9) * 9 + 2));
-    const list = makeBots(LAVA_BOTS, spots, playerName);
+    if (mode === 'guest') return [];
+    const room = useRoom.getState();
+    const count = mode === 'host' ? room.botPlayers.length : LAVA_BOTS;
+    const spots = Array.from({ length: Math.max(1, count) }, (_, i) => new THREE.Vector3(Math.cos(i * 0.9) * 9, 0, Math.sin(i * 0.9) * 9 + 2));
+    const list = makeBots(count, spots, playerName);
+    if (mode === 'host') list.forEach((b, i) => Object.assign(b, { id: room.botPlayers[i].id, name: room.botPlayers[i].name, cfg: room.botPlayers[i].avatar }));
     if (thumb) {
       const tops: [number, number, number][] = [[0, 1.0, -11.6], [6, 1.4, 0], [-4, 0.8, 3], [3, 0.7, 8], [12, 1.5, 3], [-10, 1.1, 10], [2, 1.0, -5]];
       list.forEach((b, i) => {
@@ -83,7 +100,24 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const botGoal = useRef(new Map<string, { x: number; z: number; react: number }>());
-  const aliveBots = () => bots.filter((b) => !b.out).length;
+  const aliveBots = () => bots.filter((b) => !b.out && !b.falling).length;
+
+  /** Anfitrión: cuántos siguen en juego (personas + bots) */
+  const aliveCount = () => {
+    const room = useRoom.getState();
+    return room.players.filter((p) => !humansOut.current.has(p.id)).length + aliveBots();
+  };
+
+  /** Anfitrión: alguien quedó fuera (persona o bot) */
+  const markOut = (id: string, isBot: boolean) => {
+    if (outOrder.current.includes(id)) return;
+    outOrder.current.push(id);
+    if (!isBot) humansOut.current.add(id);
+    broadcast({ t: 'out', id });
+    const n = aliveCount();
+    useRun.getState().set({ players: n });
+    broadcast({ t: 'alive', n });
+  };
 
   /** Al sonar la alarma: cada bot elige a qué mueble correr (y a veces se equivoca) */
   const planBots = (round: number) => {
@@ -152,24 +186,29 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         sfx.splash();
         burst(b.pos.clone().setY(0.5), '#ff6a2b', 16);
         useRun.getState().showToast(`🔥 ¡${b.name} tocó la lava!`);
+        if (mode === 'host') markOut(b.id, true);
       }
     }
-    // cuántos siguen en juego (bots + tú)
-    const alive = bots.filter((b) => !b.out && !b.falling).length + 1;
-    if (useRun.getState().players !== alive) useRun.getState().set({ players: alive });
+    // cuántos siguen en juego (bots + tú) — en sala lo cuenta el anfitrión
+    if (mode === 'solo') {
+      const alive = aliveBots() + 1;
+      if (useRun.getState().players !== alive) useRun.getState().set({ players: alive });
+    }
   };
 
-  const finish = (won: boolean) => {
+  /** Mostrar el resultado con el lugar que me tocó */
+  const showResult = (place: number, total: number) => {
     const s = g.current;
+    if (s.phase === 'over') return;
+    const lost = meOut.current || useRun.getState().lives <= 0;
     s.phase = 'over';
     const run = useRun.getState();
-    const survived = won ? s.round : Math.max(0, s.round - 1);
-    const place = won ? 1 : aliveBots() + 1;
+    const survived = lost ? Math.max(0, s.round - 1) : s.round;
     const bonus = PLACE_BONUS[place - 1] ?? 0;
     if (bonus) run.addCoins(bonus);
     const e = engine.current;
     if (e) e.anim.cheer = place <= 3 ? 999 : 2;
-    bots.forEach((b) => !b.out && (b.anim.cheer = 999));
+    bots.forEach((b) => !b.out && !b.falling && (b.anim.cheer = 999));
     sfx.win();
     const medal = ['🥇', '🥈', '🥉'][place - 1];
     run.set({
@@ -179,17 +218,131 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       result: {
         emoji: medal ?? '🌋',
         title: place === 1 ? '¡Sobreviviste a la lava!' : place === 2 ? '¡Segundo lugar!' : place === 3 ? '¡Tercer lugar!' : '¡Buen intento!',
-        subtitle: `Lugar ${place} de ${LAVA_BOTS + 1} • ${survived} ronda${survived === 1 ? '' : 's'}` + (bonus ? ` • +${bonus} de premio` : ''),
+        subtitle: `Lugar ${place} de ${total} • ${survived} ronda${survived === 1 ? '' : 's'}` + (bonus ? ` • +${bonus} de premio` : ''),
         coins: useRun.getState().coins,
         record: false,
       },
     });
   };
 
+  /** Solo: terminó la partida contra bots */
+  const finishSolo = (won: boolean) => showResult(won ? 1 : aliveBots() + 1, LAVA_BOTS + 1);
+
+  /** Anfitrión: calcula lugares y avisa a todos */
+  const finishHost = () => {
+    const room = useRoom.getState();
+    const all = [...room.players.map((p) => p.id), ...bots.map((b) => b.id)];
+    const alive = all.filter((id) => !outOrder.current.includes(id));
+    const ranking: Ranking = [
+      ...alive.map((id) => ({ id, name: nameInRoom(id), place: 1 })),
+      ...[...outOrder.current].reverse().map((id) => ({ id, name: nameInRoom(id), place: 0 })),
+    ];
+    // los que siguen vivos empatan en 1°; los eliminados, del último que cayó al primero
+    let next = alive.length ? 2 : 1;
+    ranking.forEach((r) => {
+      if (!alive.includes(r.id)) r.place = next++;
+    });
+    broadcast({ t: 'end', ranking });
+    const mine = ranking.find((r) => r.id === room.myId);
+    showResult(mine?.place ?? ranking.length, ranking.length);
+  };
+
+  /* ---- Fases de la ronda (el anfitrión las decide; el invitado las recibe) ---- */
+  const applyWarn = (round: number, dur: number) => {
+    const s = g.current;
+    s.round = round;
+    s.burnedThisRound = false;
+    s.phase = 'warn';
+    s.dur = s.t = dur;
+    sfx.count();
+    useRun.getState().set({ round, banner: { name: '', color: '#ff6a2b', text: '🔥 ¡EL PISO ES LAVA!' }, bar: 1 });
+  };
+  const applyLava = (dur: number) => {
+    const s = g.current;
+    s.phase = 'lava';
+    s.dur = s.t = dur;
+    sfx.fall();
+    useRun.getState().set({ banner: { name: '', color: '#ff3d1f', text: '🌋 ¡No toques el piso!' }, bar: 1 });
+  };
+  /** La lava se enfría (y a veces se hunde un mueble) */
+  const applySafe = (sink: number, wait: number) => {
+    const s = g.current;
+    const run = useRun.getState();
+    const e = engine.current;
+    if (!s.burnedThisRound && !meOut.current && e) {
+      run.addCoins(1);
+      sfx.coin();
+      burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.4), '#ffd23f', 12);
+    }
+    const f = furniture()[sink];
+    if (f) {
+      f.active = false;
+      run.showToast('😱 ¡Se hundió un mueble!');
+    } else if (s.round % 3 === 0) run.showToast(`¡Ronda ${s.round}! ¡Más rápido! ⚡`);
+    s.phase = 'safe';
+    s.dur = 0;
+    s.t = wait;
+    run.set({ banner: null, bar: 0 });
+  };
+
+  // 👫 Mensajes de la sala
+  useEffect(() => {
+    if (mode === 'solo') return;
+    const room = useRoom.getState();
+    useRun.getState().set({ players: room.players.length + room.botPlayers.length });
+    return onNetMessage((m) => {
+      if (mode === 'host') {
+        if (m.t === 'out' && !outOrder.current.includes(m.id)) {
+          useRun.getState().showToast(`🔥 ¡${nameInRoom(m.id)} quedó fuera!`);
+          markOut(m.id, false);
+        }
+        return;
+      }
+      switch (m.t) {
+        case 'lava':
+          if (m.ph === 'warn') applyWarn(m.round, m.dur);
+          else if (m.ph === 'lava') applyLava(m.dur);
+          else applySafe(m.sink, m.dur);
+          break;
+        case 'out':
+          if (m.id !== useRoom.getState().myId) useRun.getState().showToast(`🔥 ¡${nameInRoom(m.id)} tocó la lava!`);
+          break;
+        case 'alive':
+          useRun.getState().set({ players: m.n });
+          break;
+        case 'end': {
+          const mine = m.ranking.find((r) => r.id === useRoom.getState().myId);
+          showResult(mine?.place ?? m.ranking.length, m.ranking.length);
+          break;
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
   const respawnOnFurniture = (e: Engine) => {
     const list = furniture().filter((s) => s.active && s.kind !== 'bounce');
     const s = list[Math.floor(Math.random() * list.length)] ?? furniture()[0];
     e.ctrl.reset(new THREE.Vector3(s.center.x, s.max.y + 0.02, s.center.z), e.ctrl.facing);
+  };
+
+  const loseLife = (e: Engine) => {
+    const run = useRun.getState();
+    const lives = run.lives - 1;
+    run.set({ lives: Math.max(0, lives) });
+    if (lives > 0) {
+      run.showToast(lives === 1 ? '🔥 ¡Quema! Te queda 1 ❤️' : `🔥 ¡Quema! Te quedan ${lives} ❤️`);
+      respawnOnFurniture(e);
+      return;
+    }
+    if (mode === 'solo') return finishSolo(false);
+    // en sala: quedo fuera pero sigo mirando
+    meOut.current = true;
+    respawnOnFurniture(e);
+    run.showToast('¡Quedaste fuera! 👀 Mira quién gana');
+    const myId = useRoom.getState().myId;
+    if (mode === 'host') markOut(myId, false);
+    else sendToHost({ t: 'out', id: myId });
   };
 
   const hooks = useRef<LevelHooks>({});
@@ -200,7 +353,7 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       if (thumb) return;
       const run = useRun.getState();
       const playing = run.status === 'playing';
-      if (playing || s.phase === 'over') updateLavaBots(dt);
+      if (mode !== 'guest' && (playing || s.phase === 'over')) updateLavaBots(dt);
       // muebles hundidos bajan poco a poco
       for (const f of furniture()) {
         if (!f.obj) continue;
@@ -208,22 +361,21 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         f.obj.position.y += (want - f.obj.position.y) * (1 - Math.exp(-2.5 * dt));
       }
       if (s.safeT > 0) s.safeT -= dt;
-      if (s.phase === 'over' || !playing) return;
+      if (s.phase === 'over') return;
+      // en sala el juego sigue aunque abras el menú
+      if (!playing && mode === 'solo') return;
       s.t -= dt;
 
-      // ¿la niña está tocando la lava?
-      if (s.phase === 'lava' && s.safeT <= 0) {
+      // ¿estás tocando la lava?
+      if (s.phase === 'lava' && s.safeT <= 0 && !meOut.current && playing) {
         const onFloor = (e.ctrl.grounded && e.ctrl.ground === floor()) || e.ctrl.pos.y < 0.05;
         if (onFloor) {
           s.burnedThisRound = true;
           s.safeT = 1.5;
           sfx.fall();
           burst(e.ctrl.pos.clone().setY(0.6), '#ff6a2b', 22);
-          const lives = run.lives - 1;
-          run.set({ lives: Math.max(0, lives) });
-          if (lives <= 0) return finish(false);
-          run.showToast(lives === 1 ? '🔥 ¡Quema! Te queda 1 ❤️' : `🔥 ¡Quema! Te quedan ${lives} ❤️`);
-          respawnOnFurniture(e);
+          loseLife(e);
+          if (g.current.phase === 'over') return;
         }
       }
 
@@ -233,47 +385,46 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
         run.set({ bar });
       }
 
-      if (s.t > 0) return;
+      if (mode === 'guest' || s.t > 0) return; // el invitado solo obedece al anfitrión
       if (s.phase === 'wait' || s.phase === 'safe') {
         // 🚨 ¡alarma!
-        s.round += 1;
-        s.burnedThisRound = false;
-        s.phase = 'warn';
-        s.dur = s.t = Math.max(2.2, 4.2 - s.round * 0.2);
-        planBots(s.round);
-        sfx.count();
-        run.set({ round: s.round, banner: { name: '', color: '#ff6a2b', text: '🔥 ¡EL PISO ES LAVA!' }, bar: 1 });
+        const round = s.round + 1;
+        const dur = Math.max(2.2, 4.2 - round * 0.2);
+        applyWarn(round, dur);
+        planBots(round);
+        if (mode === 'host') broadcast({ t: 'lava', ph: 'warn', round, dur, sink: -1 });
       } else if (s.phase === 'warn') {
-        s.phase = 'lava';
-        s.dur = s.t = 4;
-        sfx.fall();
-        run.set({ banner: { name: '', color: '#ff3d1f', text: '🌋 ¡No toques el piso!' }, bar: 1 });
+        applyLava(4);
+        if (mode === 'host') broadcast({ t: 'lava', ph: 'lava', round: s.round, dur: 4, sink: -1 });
       } else if (s.phase === 'lava') {
-        // la lava se enfría
-        if (!s.burnedThisRound) {
-          run.addCoins(1);
-          sfx.coin();
-          burst(e.ctrl.pos.clone().setY(e.ctrl.pos.y + 2.4), '#ffd23f', 12);
+        if (mode === 'solo' && (s.round >= LAVA_ROUNDS || aliveBots() === 0)) {
+          applySafe(-1, 0);
+          return finishSolo(true);
         }
-        if (s.round >= LAVA_ROUNDS || aliveBots() === 0) return finish(true);
         // se hunde un mueble (más difícil)
+        let sink = -1;
         if (s.round >= 2) {
-          const active = furniture().filter((f) => f.active);
-          if (active.length > 6) {
-            const f = active[Math.floor(Math.random() * active.length)];
-            f.active = false;
-            run.showToast('😱 ¡Se hundió un mueble!');
-          }
+          const all = furniture();
+          const active = all.filter((f) => f.active);
+          if (active.length > 6) sink = all.indexOf(active[Math.floor(Math.random() * active.length)]);
         }
-        s.phase = 'safe';
-        s.dur = 0;
-        s.t = 3 + Math.random() * 1.5;
+        const wait = 3 + Math.random() * 1.5;
+        if (mode === 'host') {
+          // se acaba al terminar las rondas o cuando queda uno solo (si eran varios)
+          const total = useRoom.getState().players.length + bots.length;
+          const over = s.round >= LAVA_ROUNDS || aliveCount() <= (total > 1 ? 1 : 0);
+          if (over) sink = -1;
+          broadcast({ t: 'lava', ph: 'safe', round: s.round, dur: wait, sink });
+          applySafe(sink, wait);
+          if (over) return finishHost();
+        } else applySafe(sink, wait);
         wanderBots();
-        run.set({ banner: null, bar: 0 });
-        if (s.round % 3 === 0) run.showToast(`¡Ronda ${s.round}! ¡Más rápido! ⚡`);
       }
     },
   };
+
+  const botEntries = (): PosEntry[] =>
+    bots.map((b) => [b.id, Math.round(b.pos.x * 100) / 100, Math.round(b.pos.y * 100) / 100, Math.round(b.pos.z * 100) / 100, Math.round(b.facing * 100) / 100, b.anim.speed, b.anim.grounded ? 1 : 0, b.out ? 1 : 0]);
 
   return (
     <>
@@ -282,6 +433,12 @@ export function LavaLevel({ avatar, thumb }: { avatar: AvatarConfig; thumb?: Thu
       <Floor phase={g} />
       <RoomDecor />
       <BotsView bots={bots} />
+      {mode !== 'solo' && (
+        <>
+          <NetSync engine={engine} isOut={() => meOut.current} extra={mode === 'host' ? botEntries : undefined} />
+          <RemotePlayers />
+        </>
+      )}
       <Bursts />
     </>
   );

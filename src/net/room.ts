@@ -10,7 +10,7 @@ import { clearRemotes, updateRemote, type PosEntry } from './remote';
 // - Los demás se conectan DIRECTO al anfitrión (WebRTC). No hay chat ni salas públicas.
 // - El anfitrión manda en el juego (rondas, colores, lugares) y reenvía las posiciones.
 
-export type NetGame = 'colors' | 'obby' | 'stars';
+export type NetGame = 'colors' | 'obby' | 'stars' | 'race' | 'lava' | 'jail';
 export interface NetPlayer {
   id: string;
   name: string;
@@ -37,7 +37,8 @@ export type Msg =
   | { t: 'placed'; id: string; name: string; place: number }
   | { t: 'stars'; s: [number, number, number, number, number][] }
   | { t: 'grab'; i: number }
-  | { t: 'score'; id: string; i: number; v: number; total: number };
+  | { t: 'score'; id: string; i: number; v: number; total: number }
+  | { t: 'lava'; ph: 'warn' | 'lava' | 'safe'; round: number; dur: number; sink: number };
 
 const PREFIX = 'bloxi-sala-';
 const MAX_PLAYERS = 8;
@@ -187,14 +188,17 @@ export function setRoomBots(bots: boolean) {
   broadcastLobby();
 }
 
+/** Hasta cuántos jugadores se rellena con bots (los juegos que no aparecen no llevan bots) */
+export const BOT_FILL: Partial<Record<NetGame, number>> = { colors: 8, lava: 8, race: 6, stars: 5 };
+
 const BOT_NAMES = ['LunaStar', 'MateoPro', 'ValeRainbow', 'LeoDino', 'MiaCookie', 'NicoBlox', 'EmmaPanda', 'TomiRocket'];
 
 export function startRoomGame() {
   const s = useRoom.getState();
   if (!s.isHost) return;
   const humans = s.players.length;
-  // 🤖 rellenar con bots: Colores hasta 8 jugadores, Estrellas hasta 5
-  const fillTo = s.game === 'colors' ? 8 : s.game === 'stars' ? 5 : 0;
+  // 🤖 rellenar con bots: Colores y Lava hasta 8 jugadores, Carreritas hasta 6, Estrellas hasta 5
+  const fillTo = BOT_FILL[s.game] ?? 0;
   const botPlayers: NetPlayer[] =
     s.bots && fillTo
       ? Array.from({ length: Math.max(0, fillTo - humans) }, (_, i) => ({
@@ -303,3 +307,7 @@ export function netMode(): 'solo' | 'host' | 'guest' {
   if (s.status !== 'playing' || !s.inGame) return 'solo';
   return s.isHost ? 'host' : 'guest';
 }
+
+// solo en desarrollo: para pruebas automáticas
+if (import.meta.env.DEV)
+  (window as unknown as Record<string, unknown>).__room = { useRoom, createRoom, joinRoom, setRoomGame, setRoomBots, startRoomGame };
